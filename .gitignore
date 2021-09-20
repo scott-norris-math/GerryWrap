@@ -131,4 +131,7 @@ dmypy.json
 
 
 # data folder
+TXSN/ensembles/
 data/
+drafts/
+attic/
