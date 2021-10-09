@@ -2,17 +2,29 @@ import csv
 import zipfile
 from collections import defaultdict
 from itertools import groupby
-from typing import Callable
+from typing import Callable, Any
 import numpy as np
 import gerrychain
+import pickle
 
 
 CHAMBERS = ['TXSN', 'USCD', 'TXHD']
 
 
+def load_plans_from_path(path: str) -> np.ndarray:
+    return np.load(path)['arr_0']
+
+
 def load_plans(directory: str, ensemble_description: str, file_number: int) -> np.ndarray:
-    plans = np.load(f'{directory}ensembles/{ensemble_description}/plans_{file_number}.npz')['arr_0']
-    return plans + 1
+    return load_plans_from_path(f'{directory}ensembles/ensemble_{ensemble_description}/plans_{file_number}.npz')
+
+
+def load_plans_from_file(directory: str, ensemble_description: str, plans_filename: str) -> np.ndarray:
+    return load_plans_from_path(f'{directory}ensembles/ensemble_{ensemble_description}/{plans_filename}')
+
+
+def load_plans_from_files(directory, ensemble_description, file_numbers):
+    return np.concatenate([load_plans(directory, ensemble_description, x) for x in file_numbers])
 
 
 def build_assignment(graph: gerrychain.Graph, plan: np.ndarray) -> dict[str, int]:
@@ -69,6 +81,10 @@ def load_plan_vectors(chamber: str, input_directory: str, statistic_name: str, p
     return plan_vectors
 
 
+def build_seeds_directory(directory):
+    return f'{directory}seeds/'
+
+
 def build_ensemble_directory(directory: str, ensemble_description: str) -> str:
     return f'{directory}ensembles/ensemble_{ensemble_description}/'
 
@@ -102,6 +118,11 @@ def load_numpy_csv(path: str) -> np.ndarray:
     return np.loadtxt(path, delimiter=',')
 
 
+def load_merged_numpy_csv(filename: str, directories: list[str]) -> np.ndarray:
+    data = [cm.load_numpy_csv(x + filename) for x in directories]
+    return np.concatenate(data)
+
+
 def get_number_districts(chamber: str) -> int:
     return {
         'USCD': 38,
@@ -118,19 +139,30 @@ def get_allowed_number_districts(chamber: str) -> list[int]:
     }[chamber]
 
 
-def build_canonical_plan(plan: np.ndarray) -> frozenset[frozenset[np.int16]]:
-    district_plans_lookup = defaultdict(set[np.uint16])
+def build_canonical_plan(plan: np.ndarray) -> frozenset[frozenset[int]]:
+    district_plans_lookup = defaultdict(set[int])
     for i, district in enumerate(plan):
-        district_plans_lookup[district].add(np.int16(i))
-    canonical_plan = frozenset(frozenset(x) for x in district_plans_lookup.values())
-    max_district = max(district_plans_lookup.keys())
-    if len(canonical_plan) != max_district:
-        raise RuntimeError("Error in Canonical Plan formation")
-    return canonical_plan
+        district_plans_lookup[district].add(i)
+    return frozenset(frozenset(x) for x in district_plans_lookup.values())
 
 
 def calculate_plan_hash(plan: np.ndarray) -> int:
     return hash(build_canonical_plan(plan))
+
+
+def determine_unique(plans: np.ndarray) -> np.ndarray:
+    unique_plans = []
+    plan_hashes = set()
+    for i, plan in enumerate(plans):
+        if i % 1000 == 0:
+            print(f'{i} Number Unique: {len(unique_plans)}')
+
+        plan_hash = calculate_plan_hash(plan)
+        if plan_hash not in plan_hashes:
+            plan_hashes.add(plan_hash)
+            unique_plans.append(plan)
+
+    return np.array(unique_plans)
 
 
 def adjoin(l: list, f: Callable) -> list:
@@ -158,8 +190,18 @@ def join_dict(d1, d2):
     return {x: (y, d2[x]) for x, y in d1.items()}
 
 
-def load_merged_numpy_csv(filename: str, directories: list[str]) -> np.ndarray:
-    data = [cm.load_numpy_csv(x + filename) for x in directories]
-    return np.concatenate(data)
+def save_pickle(path: str, object: Any) -> None:
+    outfile = open(path, 'wb')
+    pickle.dump(object, outfile)
+    outfile.close()
+
+
+def load_pickle(path: str) -> Any:
+    infile = open(path, 'rb')
+    object = pickle.load(infile)
+    infile.close()
+    return object
+
+
 
 

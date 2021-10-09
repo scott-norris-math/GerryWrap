@@ -13,7 +13,6 @@ import utilities as ut
 from timer import Timer
 import common as cm
 
-
 SCTB_COLUMN_NAME = 'SCTBKEY'
 
 
@@ -246,7 +245,7 @@ def save_vector_file(chamber: str, df: pd.DataFrame, path: str,
     statistics_list = [statistics_lookup[str(x)] for x in range(1, max_district + 1)]
     print(f"Statistics: {len(statistics_list)} {statistics_list}")
 
-    save_vector_csv(path, statistics_list)
+    cm.save_vector_csv(path, statistics_list)
 
 
 def save_plan_vectors(chamber: str, directory: str, plan: int):
@@ -333,7 +332,7 @@ def save_plan_vectors_summaries(chamber: str, directory: str) -> None:
 
         plan_directory = build_plan_vectors_directory(chamber, directory, plan)
         for statistic, _ in vector_settings:
-            vector = load_numpy_csv(plan_directory + statistic)
+            vector = cm.load_numpy_csv(plan_directory + statistic)
             row = {'plan': plan, 'description': plan_metadata.description,
                    'submitter': plan_metadata.submitter, 'previous_plan': plan_metadata.previous_plan,
                    'statistic': statistic}
@@ -419,7 +418,7 @@ def save_graph(chamber: str, directory: str, plans_metadata: pd.DataFrame) -> No
         return "\n".join(s.split(" "))
 
     previous_plans = set(plans_metadata['previous_plan'])
-    max_ammendments =  plans_metadata.filter(['plan', 'submitter', 'previous_plan']). \
+    max_ammendments = plans_metadata.filter(['plan', 'submitter', 'previous_plan']). \
         query('previous_plan > 0').groupby(by=['submitter', 'previous_plan']).aggregate(max).to_dict()['plan']
 
     add_overridden_ammendments = False
@@ -450,12 +449,7 @@ def save_graph(chamber: str, directory: str, plans_metadata: pd.DataFrame) -> No
                                         max_ammendments.get((x.submitter, x.previous_plan)) == x.plan)
                    for x in admissible_metadata]
 
-    if chamber == 'TXSN' or chamber == 'TXHD':
-        width = 22
-    else:
-        width = 12
-
-    fig, ax = plt.subplots(figsize=(width, 8))
+    fig, ax = plt.subplots(figsize=(22, 8))
     nx.draw_networkx(proposed_plans_graph, pos, node_size=5500, labels=labels, node_color=node_colors)
     edge_labels = {x: "{:,}".format(y) for x, y in nx.get_edge_attributes(proposed_plans_graph, 'weight').items()}
     nx.draw_networkx_edge_labels(proposed_plans_graph, pos, edge_labels=edge_labels)
@@ -476,8 +470,8 @@ def build_party_lookup(directory):
         split_names = [normalize(x.split(' ')) for x in legislator_lookup['Name'] if x != 'Vacant']
         names = [(elements[0], elements[1]) for elements in split_names]
         # print(f'Names: {names}')
-        names_grouped = groupby_project(names,
-                                        lambda x: x[1], lambda x: x[0])
+        names_grouped = cm.groupby_project(names,
+                                           lambda x: x[1], lambda x: x[0])
         # print(f'Names Grouped: {names_grouped}')
         single_name_mapping = {(y[0] + ' ' + x): x.upper() for x, y in names_grouped if len(y) == 1}
         # print(f'Single Name: {single_name_mapping}')
@@ -608,7 +602,7 @@ if __name__ == '__main__':
         t = Timer()
         t.start()
 
-        chamber = 'TXHD' # 'TXSN'  # 'USCD'
+        chamber = 'TXHD'  # 'TXSN'  # 'USCD'
         root_directory = 'C:/Users/rob/projects/election/rob/'
         plans_directory = build_plans_directory(root_directory)
 
@@ -616,24 +610,24 @@ if __name__ == '__main__':
             # process_tabblock_data(chamber, root_directory)
             update_plan_vectors(chamber, root_directory)
 
-        if True:
+        if False:
             pd.set_option('display.width', 500)
             pd.set_option('display.max_columns', 500)
             plan = 2176
             # analyze_bef_assignments(chamber, root_directory, plan)
             # analyze_proposed_plan_seed_assignments(chamber, root_directory, plan)
-            #analyze_proposed_plan_seed_assignments_v2(chamber, root_directory, plan)
+            # analyze_proposed_plan_seed_assignments_v2(chamber, root_directory, plan)
             verify_graph(chamber, root_directory, plan)
 
         if False:
             plans_metadata = load_plans_metadata(chamber, plans_directory)
             save_current_merged_plans(chamber, root_directory, plans_metadata, force=True)
 
-        if False:
-            for chamber in ['TXSN']:  # 'cm.CHAMBERS:
+        if True:
+            for chamber in cm.CHAMBERS:
                 proposed_plans_metadata = load_plans_metadata(chamber, plans_directory)
                 save_graph_filter_2100(chamber, root_directory, proposed_plans_metadata)
-            pylab.show()
+            # pylab.show()
 
         if False:
             save_plan_vectors(chamber, root_directory, 2101)

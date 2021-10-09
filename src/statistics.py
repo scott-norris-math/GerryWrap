@@ -11,7 +11,7 @@ def calculate_mean_median(planvec: np.ndarray) -> float:
     #  majority" (D - R). Effectively this is: x -1 (to get D-R),
     #   x 2 (because MM measures diff. from midpoint), and
     #   x 100 (to make it a %)
-    return -200 * np.median(planvec) - np.mean(planvec)
+    return -200 * (np.median(planvec) - np.mean(planvec))
 
 
 def calculate_partisan_bias(planvec: np.ndarray) -> float:
@@ -142,7 +142,7 @@ def determine_plans(chamber: str, directory: str) -> list[int]:
     return plans
 
 
-def save_statistics(chamber, directory, ensemble_statistics, file_prefix, plans):
+def save_statistics(chamber: str, directory: str, ensemble_statistics, file_prefix: str, plans):
     plans = sorted(list(plans))
     ensemble_mean_median, ensemble_partisan_bias = ensemble_statistics[chamber]
     plan_vectors = cm.load_plan_vectors(chamber, directory, file_prefix, plans)

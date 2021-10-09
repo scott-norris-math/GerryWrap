@@ -316,7 +316,7 @@ def save_plots(chamber, root_directory, seed_description, ensemble_number, curre
 
     # For which should we plot district #, if any?
     plan_pnums = [False, True]
-    true_pnums = [i for i, x in enumerate(plan_pnums) if x]
+    # true_pnums = [i for i, x in enumerate(plan_pnums) if x]
     # print(true_pnums)
 
     # Now we give each plan a name
@@ -383,54 +383,48 @@ def register_colormap():
 
 
 def build_points(graph: nx.Graph, assignment):
-    # list(graph.nodes.items())[0]
     node_geometries = [(assignment[geoid], node['geometry']) for (geoid, node) in graph.nodes.items()]
+
     district_geometry_components = defaultdict(list)
     for district, geometry in node_geometries:
         district_geometry_components[district].append(geometry)
+
     district_geometries = {}
     for district, geometry_components in district_geometry_components.items():
-        # print(district)
         district_geometries[district] = sh.ops.unary_union(geometry_components)
+
     points = {}
     for district, geometry in district_geometries.items():
         point_coordinates = geometry.representative_point().coords[:]
         points[district] = point_coordinates[0]
-    # print(points)
+
     return points
 
 
 # noinspection PyCallingNonCallable
 def draw_plan_map(graph: Graph, plan: np.ndarray, output_path: str) -> None:
     assignment = cm.build_assignment(graph, plan)
-    # print(assignment)
-    # changes = [(x, y, assignment[x]) for x, y in initial_partition.assignment.items() if y != assignment[x]]
-    # print(changes)
 
     partition = GeographicPartition(graph, assignment=assignment, updaters=[])
 
     cut_edges = partition['cut_edges']
-    # print(len(cut_edges))
-    # print(len(graph.edges()))
     cut_edges_districts = {(partition.assignment[x], partition.assignment[y]) for x, y in cut_edges}
-    # print(cut_edges_districts)
 
     partition_graph = nx.Graph()
     vertices = {y for x in cut_edges_districts for y in x}
 
     partition_graph.add_nodes_from(vertices)
     partition_graph.add_edges_from(cut_edges_districts)
-    # nx.draw(partition_graph)
 
     max_degree = max([y for x, y in partition_graph.degree()])
-    # print(max_degree)
+
     coloring = nx.equitable_color(partition_graph, max(12, max_degree + 1))
     coloring_assignment = {x: coloring[y] for x, y in zip(sorted(graph.nodes()), plan)}
 
     coloring_partition = GeographicPartition(graph, assignment=coloring_assignment, updaters=[])
 
     plt.rcParams['figure.figsize'] = [20, 20]
-    coloring_partition.plot(cmap='CustomStacked')  # cmap="Category20" #'Set3'
+    coloring_partition.plot(cmap='CustomStacked')
 
     points = build_points(graph, assignment)
     for district, point in points.items():
@@ -451,21 +445,6 @@ def draw_ensemble_map(directory: str, graph: Graph, plans: np.ndarray, ensemble_
                   f'{plots_directory}{ensemble_description}_map_{plan_absolute_number}.png')
 
 
-def determine_unique(plans: np.ndarray) -> list[np.ndarray]:
-    unique_plans = []
-    plan_hashes = set()
-    for i, plan in enumerate(plans):
-        if i % 1000 == 0:
-            print(f'{i} Number Unique: {len(unique_plans)}')
-
-        plan_hash = cm.calculate_plan_hash(plan)
-        if plan_hash not in plan_hashes:
-            plan_hashes.add(plan_hash)
-            unique_plans.append(plan)
-
-    return unique_plans
-
-
 if __name__ == '__main__':
     def main():
         directory = 'C:/Users/rob/projects/election/rob/'
@@ -478,25 +457,26 @@ if __name__ == '__main__':
             seed_description = 'random_seed'
             ensemble_number = 2
 
-        if True:
+        if False:
             current_plan = 2100
             comparison_plans = sorted(
                 list(pp.get_valid_plans(chamber, pp.build_plans_directory(directory)) - {2100}))
 
             save_plots(chamber, directory, seed_description, ensemble_number, current_plan, comparison_plans)
 
-        if False:
+        if True:
             # partition = load_partition(directory)
             # draw_rainbow_map(partition)
+
             register_colormap()
-            graph = si.load_graph_with_geometry(directory, 'graph_TX_2020_cntyvtd_TXHD_2176.gpickle',
-                                             'nodes_TX_2020_cntyvtd_TXHD_2176.parquet', False)
+            geodata = si.load_geodataframe(directory, 'nodes_TX_2020_cntyvtd_TXHD_2176.parquet')
+            graph = si.load_graph_with_geometry(directory, 'graph_TX_2020_cntyvtd_TXHD_2176.gpickle', geodata)
             # "graph_TX_2020_cntyvtd_TXHD_2101.gpickle" 'nodes_TX_2020_cntyvtd_TXHD_2101.parquet'
 
-            for ensemble_description in ['ensemble_TXHD_2176_1']:  # , 'ensemble_TXHD_2101_old_script_1'
+            for ensemble_description in ['TXHD_2176_1']:
                 print(ensemble_description)
                 plans = np.concatenate([cm.load_plans(directory, ensemble_description, x * 10) for x in range(0, 1)])
-                plans = determine_unique(plans)
+                plans = cm.determine_unique(plans)
                 print(f"Number Unique Plans: {len(plans)}")
                 for x in range(0, 7):
                     plan_number = x * 100

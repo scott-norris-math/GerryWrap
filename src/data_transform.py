@@ -72,19 +72,28 @@ def hisp_percent(df: pd.DataFrame) -> pd.Series:
 
 
 def black_percent(df: pd.DataFrame) -> pd.Series:
-    entire_population_o17_columns = [col for col in df.columns
-                                     if (col.startswith('o17') and not col.startswith('o17_nonhisp'))]
-    race_pop_columns = [col for col in entire_population_o17_columns if 'black' in col]
-    race_sum = df[race_pop_columns].sum(axis=1)
+    race_sum = black_sum(df)
     return race_sum / df['o17_pop']
 
 
+def black_sum(df):
+    entire_population_o17_columns = [col for col in df.columns
+                                     if (col.startswith('o17') and not col.startswith('o17_nonhisp'))]
+    race_pop_columns = [col for col in entire_population_o17_columns if 'black' in col]
+    return df[race_pop_columns].sum(axis=1)
+
+
 def black_hisp_percent(df: pd.DataFrame) -> pd.Series:
+    race_sum = black_hisp_sum(df)
+    return race_sum / df['o17_pop']
+
+
+def black_hisp_sum(df):
     nonhisp_o17_columns = [col for col in df.columns if col.startswith('o17_nonhisp')]
     race_nonhisp_o17_columns = [col for col in nonhisp_o17_columns if 'black' in col]
     race_pop_columns = ['o17_hisp_pop'] + race_nonhisp_o17_columns
     race_sum = df[race_pop_columns].sum(axis=1)
-    return race_sum / df['o17_pop']
+    return race_sum
 
 
 def pres20_percent(df: pd.DataFrame) -> pd.Series:
