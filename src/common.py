@@ -6,6 +6,7 @@ from typing import Callable, Any
 import numpy as np
 import gerrychain
 import pickle
+from addict import Dict
 
 
 CHAMBERS = ['TXSN', 'USCD', 'TXHD']
@@ -51,13 +52,15 @@ def unzip_file(output_directory: str, zip_path: str) -> None:
     print(f"Unzipping: {zip_path} End")
 
 
-def load_ensemble_matrix(input_directory: str, statistic_name: str) -> np.ndarray:
+def load_ensemble_matrix_sorted_transposed(input_directory: str, statistic_name: str) -> np.ndarray:
     path = input_directory + statistic_name + '.npz'
-    ensemble_matrix = load_numpy_compressed(path)
+    return load_ensemble_matrix_sorted_transposed_from_path(path)
 
+
+def load_ensemble_matrix_sorted_transposed_from_path(path):
+    ensemble_matrix = load_numpy_compressed(path)
     for row in ensemble_matrix:
         row.sort()
-
     ensemble_matrix = ensemble_matrix.transpose()
     districts, chainlength = np.shape(ensemble_matrix)
     print(districts, "districts")
@@ -139,7 +142,7 @@ def get_allowed_number_districts(chamber: str) -> list[int]:
     }[chamber]
 
 
-def build_canonical_plan(plan: np.ndarray) -> frozenset[frozenset[int]]:
+def build_canonical_plan_set(plan: np.ndarray) -> frozenset[frozenset[int]]:
     district_plans_lookup = defaultdict(set[int])
     for i, district in enumerate(plan):
         district_plans_lookup[district].add(i)
@@ -147,10 +150,40 @@ def build_canonical_plan(plan: np.ndarray) -> frozenset[frozenset[int]]:
 
 
 def calculate_plan_hash(plan: np.ndarray) -> int:
-    return hash(build_canonical_plan(plan))
+    return hash(build_canonical_plan_set(plan))
 
 
-def determine_unique(plans: np.ndarray) -> np.ndarray:
+def build_plan_set_list(plan: np.ndarray) -> np.ndarray: # list[frozenset[int]]:
+    district_plans_lookup = defaultdict(set[int])
+    for i, district in enumerate(plan):
+        district_plans_lookup[district].add(i)
+    return np.array(frozenset(district_plans_lookup[x]) for x in sorted(district_plans_lookup))
+
+
+def diff_plan_set_list(plan1: list[frozenset[int]], plan2: list[frozenset[int]], is_multi_step=False):
+    data_type = np.uint16
+
+    changed_indices = [i for i, (x, y) in enumerate(zip(plan1, plan2)) if not x == y]
+    if len(changed_indices) == 0:
+        return {
+            'changed_indices': np.empty([0], data_type),
+            'added_nodes': np.empty([0], data_type),
+            'removed_nodes': np.empty([0], data_type)
+        }
+    elif is_multi_step or len(changed_indices) == 2:
+        first_changed_index = changed_indices[0]
+        return {
+            'changed_indices': np.array(changed_indices, data_type),
+            'added_nodes': np.array(list(plan2[first_changed_index].difference(plan1[first_changed_index])), data_type),
+            'removed_nodes': np.array(list(plan1[first_changed_index].difference(plan2[first_changed_index])),
+                                      data_type)
+        }
+    else:
+        error_message = f"Each plan must differ by zero or two partitions.   Differences: {changed_indices}"
+        raise RuntimeError(error_message)
+
+
+def determine_unique_plans(plans: np.ndarray) -> np.ndarray:
     unique_plans = []
     plan_hashes = set()
     for i, plan in enumerate(plans):
@@ -201,6 +234,47 @@ def load_pickle(path: str) -> Any:
     object = pickle.load(infile)
     infile.close()
     return object
+
+
+def get_current_ensemble(chamber):
+    if chamber == 'USCD':
+        seed_description = 'random_seed'
+        ensemble_number = 2
+    elif chamber == 'TXSN':
+        seed_description = 'random_seed'
+        ensemble_number = 2
+    elif chamber == 'TXHD':
+        seed_description = '2176_product'
+        ensemble_number = 1
+    else:
+        raise RuntimeError("Unknown chamber")
+
+    return seed_description, ensemble_number
+
+
+def determine_population_limit(chamber: str):
+    return {
+        'USCD': .01,
+        'TXSN': .02,
+        'TXHD': .05
+    }[chamber]
+
+
+def build_proposed_plan_simulation_settings(chamber: str, plan: int) -> Dict:
+    settings = Dict()
+    settings.networkX_graph_filename = f'graph_TX_2020_cntyvtd_{chamber}_{plan}.gpickle'
+    settings.redistricting_data_filename = f'nodes_TX_2020_cntyvtd_{chamber}_{plan}.parquet'
+    settings.country_district_graph_filename = f'adj_TX_2020_cntyvtd_{chamber}_{plan}.gpickle'
+    settings.epsilon = determine_population_limit(chamber)
+    return settings
+
+
+def build_TXSN_random_seed_simulation_settings() -> Dict:
+    settings = Dict()
+    settings.networkX_graph_filename = 'graph_TX_2020_cntyvtd_TXSN_seed_1000000.gpickle'
+    settings.epsilon = determine_population_limit('TXSN')
+    return settings
+
 
 
 

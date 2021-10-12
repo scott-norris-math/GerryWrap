@@ -34,7 +34,7 @@ def determine_data_tablock_columns(df: pd.DataFrame) -> list[str]:
 def save_data_tablock_columns(chamber: str, directory: str, data_path: str) -> None:
     data_df = pd.read_parquet(data_path)
     print("Data: " + str(len(data_df)))
-    data_columns = ['geoid', 'county', dt.get_bq_chamber_name(chamber), 'total_pop'] + \
+    data_columns = ['geoid', 'county', dt.get_census_chamber_name(chamber), 'total_pop'] + \
                    determine_data_tablock_columns(data_df)
 
     print("Data Columns: " + str(len(data_columns)))
@@ -64,7 +64,7 @@ def build_data_filtered_path(chamber: str, directory: str, suffix: str) -> str:
 
 
 def process_tabblock_data(chamber: str, directory: str) -> None:
-    bq_chamber_name = dt.get_bq_chamber_name(chamber)
+    bq_chamber_name = dt.get_census_chamber_name(chamber)
     data_path = \
         build_redistricting_data_directory(directory) + \
         'redistricting_data_nodes_TX_nodes_TX_2020_tabblock_' + \
@@ -172,7 +172,7 @@ def save_plan_data(chamber: str, directory: str, plan: int) -> None:
     joined_df.to_parquet(joined_path_parquet)
     joined_df.to_csv(joined_path_prefix + ".csv")
 
-    bq_chamber_name = dt.get_bq_chamber_name(chamber)
+    bq_chamber_name = dt.get_census_chamber_name(chamber)
     joined_df.drop(columns=['county', bq_chamber_name], inplace=True)
     joined_df['DISTRICT'] = joined_df['DISTRICT'].astype(str)
     grouped_by_district = joined_df.groupby('DISTRICT')
@@ -220,8 +220,8 @@ def sen20_percent_vector(df: pd.DataFrame) -> pd.Series:
 def build_statistics_vector_settings() -> list[tuple[str, Callable[[pd.DataFrame], pd.Series]]]:
     return [
         (dt.build_race_filename_csv('hisp', 'vector'), dt.hisp_percent),
-        (dt.build_race_filename_csv('black_hisp', 'vector'), dt.black_hisp_percent),
-        (dt.build_race_filename_csv('black', 'vector'), dt.black_percent),
+        (dt.build_race_filename_csv('black_hisp', 'vector'), dt.black_hisp_sum_percent),
+        (dt.build_race_filename_csv('black', 'vector'), dt.black_sum_percent),
         (dt.build_election_filename_csv('PRES20', 'vector'), pres20_percent_vector),
         (dt.build_election_filename_csv('SEN20', 'vector'), sen20_percent_vector),
         ('o17_pop_vector.csv', dt.o17_pop)
@@ -243,7 +243,7 @@ def save_vector_file(chamber: str, df: pd.DataFrame, path: str,
 
     statistics_lookup = {x: y for x, y in zip(df['district'], statistic_func(df))}
     statistics_list = [statistics_lookup[str(x)] for x in range(1, max_district + 1)]
-    print(f"Statistics: {len(statistics_list)} {statistics_list}")
+    # print(f"Statistics: {len(statistics_list)} {statistics_list}")
 
     cm.save_vector_csv(path, statistics_list)
 
@@ -438,11 +438,11 @@ def save_graph(chamber: str, directory: str, plans_metadata: pd.DataFrame) -> No
             proposed_plans_graph.add_edge(previous_plan, plan, weight=plan_metadata.changed_rows)
 
     party_lookup = build_party_lookup(directory)
-
     admissible_metadata = [x for x in plans_metadata.itertuples() if x.plan in proposed_plans_graph.nodes]
     submitters = {x.submitter: parse_submitter(x.submitter) for x in admissible_metadata}
 
-    pos = nx.nx_pydot.graphviz_layout(proposed_plans_graph, prog='dot')
+    layout = 'neato' if chamber == 'TXHD' else 'dot'
+    pos = nx.nx_pydot.graphviz_layout(proposed_plans_graph, prog=layout)
     labels = {x.plan: f"{x.plan}\n{build_multiline(submitters[x.submitter][1])}" for x in admissible_metadata}
     node_colors = [determine_node_color(submitters[x.submitter], party_lookup,
                                         x.previous_plan == 0 or
@@ -590,8 +590,10 @@ def extract_graph_block_assignments(graph):
     return block_assignments
 
 
-def save_graph_filter_2100(chamber, root_directory, proposed_plans_metadata):
+def save_graph_filtered(chamber, root_directory, proposed_plans_metadata):
     proposed_plans_metadata = proposed_plans_metadata[proposed_plans_metadata['plan'] != 2100]
+    if chamber=='TXHD':
+        proposed_plans_metadata = proposed_plans_metadata[proposed_plans_metadata['plan'] >= 2176]
     save_graph(chamber, root_directory, proposed_plans_metadata)
 
 
@@ -606,7 +608,7 @@ if __name__ == '__main__':
         root_directory = 'C:/Users/rob/projects/election/rob/'
         plans_directory = build_plans_directory(root_directory)
 
-        if False:
+        if True:
             # process_tabblock_data(chamber, root_directory)
             update_plan_vectors(chamber, root_directory)
 
@@ -623,11 +625,11 @@ if __name__ == '__main__':
             plans_metadata = load_plans_metadata(chamber, plans_directory)
             save_current_merged_plans(chamber, root_directory, plans_metadata, force=True)
 
-        if True:
-            for chamber in cm.CHAMBERS:
+        if False:
+            for chamber in ['TXHD']: # cm.CHAMBERS:
                 proposed_plans_metadata = load_plans_metadata(chamber, plans_directory)
-                save_graph_filter_2100(chamber, root_directory, proposed_plans_metadata)
-            # pylab.show()
+                save_graph_filtered(chamber, root_directory, proposed_plans_metadata)
+            #pylab.show()
 
         if False:
             save_plan_vectors(chamber, root_directory, 2101)

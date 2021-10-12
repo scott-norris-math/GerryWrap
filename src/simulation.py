@@ -40,28 +40,6 @@ def calculate_plan_hash_from_partition(node_id_to_index: dict[str, int], partiti
     return hash(build_canonical_plan_from_partition(node_id_to_index, partition))
 
 
-def diff_plan(plan1: np.ndarray, plan2: np.ndarray):
-    data_type = np.uint16
-
-    changed_indices = [i for i, (x, y) in enumerate(zip(plan1, plan2)) if not x == y]
-    if len(changed_indices) == 0:
-        return {
-            'changed_indices': np.empty([0], data_type),
-            'added_nodes': np.empty([0], data_type),
-            'removed_nodes': np.empty([0], data_type)
-        }
-    elif len(changed_indices) == 2:
-        first_changed_index = changed_indices[0]
-        return {
-            'changed_indices': np.array(changed_indices, data_type),
-            'added_nodes': np.array(list(plan2[first_changed_index].difference(plan1[first_changed_index])), data_type),
-            'removed_nodes': np.array(list(plan1[first_changed_index].difference(plan2[first_changed_index])),
-                                      data_type)
-        }
-    else:
-        raise RuntimeError("Each plan must differ by zero or two partitions")
-
-
 def display_partition(initial_partition: Partition, partition: Partition):
     for x in partition.graph.nodes:
         print([x, initial_partition.assignment[x], partition.assignment[x]])
@@ -74,6 +52,8 @@ def build_geographic_partition(graph: Graph, assignment_column: str) -> Geograph
 def load_geodataframe(directory: str, redistricting_data_filename: str = None) -> gpd.GeoDataFrame:
     redistricting_data_directory = pp.build_redistricting_data_directory(directory)
 
+    # TODO: Use new redistricting combined file (remove row number column)
+    #       Load from parquet - use one block of code
     if redistricting_data_filename is None:
         node_data = pd.read_csv(f'{redistricting_data_directory}nodes_TX_2020_cntyvtd_sldu.csv')
         node_data['geometry'] = node_data['polygon'].apply(wkt.loads)
@@ -171,17 +151,9 @@ def build_updaters():
 
 def build_assignment_column(chamber: str, is_plan_proposal: bool):
     if not is_plan_proposal:
-        return dt.get_bq_chamber_name(chamber)
+        return dt.get_census_chamber_name(chamber)
     else:
         return 'district'
-
-
-def determine_population_limit(chamber: str):
-    return {
-        'USCD': .01,
-        'TXSN': .02,
-        'TXHD': .05
-    }[chamber]
 
 
 def load_county_district_graph(directory, filename):
@@ -207,15 +179,18 @@ def build_chain(chamber: str, directory: str, settings, number_steps: int) -> (M
     # Now we will really generate many plans and save data
     proposal = partial(recom,
                        pop_col="total_pop",
-                       pop_target=calculate_idead_population(initial_partition),
+                       pop_target=calculate_ideal_population(initial_partition),
                        epsilon=settings.epsilon,
                        node_repeats=2)
 
     if chamber == 'TXHD':
         county_district_graph = load_county_district_graph(directory, settings.country_district_graph_filename)
+        whole_targets, intersect_targets = extract_defect_targets(county_district_graph)
         state = {
-            'graph': county_district_graph,
-            'node_id_to_index': build_node_id_to_index(initial_partition)
+            'node_id_to_index': build_node_id_to_index(initial_partition),
+            'dual_graph': networkXGraph,
+            'whole_targets': whole_targets,
+            'intersect_targets': intersect_targets
         }
         accept_function = build_accept_function(state)
     else:
@@ -246,13 +221,19 @@ def build_chain(chamber: str, directory: str, settings, number_steps: int) -> (M
         total_steps=number_steps
     )
 
-    if chamber == 'TXHD':
-        state['chain'] = chain
-
     return chain, elections
 
 
 def run_chain(chain: MarkovChain, elections: Iterable[Election], output_directory: str) -> None:
+    run_chain_impl(chain, elections, output_directory)
+
+
+def run_chain_calculate_data(chain: MarkovChain, elections: Iterable[Election], output_directory: str) -> None:
+    run_chain_impl(chain, elections, output_directory, initialize_data, update_data, save_compressed_data)
+
+
+def run_chain_impl(chain: MarkovChain, elections: Iterable[Election], output_directory: str, initialize_data=None,
+                   update_data=None, save_data=None) -> None:
     def build_maps_directory(directory):
         return f'{directory}maps/'
 
@@ -261,7 +242,9 @@ def run_chain(chain: MarkovChain, elections: Iterable[Election], output_director
     node_id_to_index = build_node_id_to_index(chain.initial_state)
     save_columns_map(output_directory, node_id_to_index)
 
-    data = initialize_data(chain.total_steps, elections)
+    data = None
+    if initialize_data is not None:
+        data = initialize_data(chain.total_steps, elections)
 
     plans_array = None
     plans_output_size = 100000
@@ -298,12 +281,13 @@ def run_chain(chain: MarkovChain, elections: Iterable[Election], output_director
             for node_index in node_set:
                 plans_array[plan_index, node_index] = district_index_npu8
 
-        update_data(partition, data, step_number)
+        if update_data is not None:
+            update_data(partition, data, step_number)
 
         step_number += 1
 
-    save_data(output_directory, data)
-    save_compressed_data(output_directory, data)
+    if save_data is not None:
+        save_data(output_directory, data)
     save_partial_plans(output_directory, plans_array, plans_output_size, step_number)
 
 
@@ -462,18 +446,18 @@ def calculate_county_defects(graph: nx.Graph, counties: Iterable[str]) -> list[C
                                      for district_node in graph[county])
         defect_whole = abs(graph.nodes[county]['whole_target'] - number_whole_districts)
         number_intersected_districts = graph.degree[county]
-        defect_intersected = abs(
-            graph.nodes[county]['intersect_target'] - number_intersected_districts)
+        defect_intersected = abs(graph.nodes[county]['intersect_target'] - number_intersected_districts)
 
-        data.append(CountyDefect(county, number_whole_districts, defect_whole,
-                                 number_intersected_districts, defect_intersected))
+        data.append(
+            CountyDefect(county=county, number_whole_districts=number_whole_districts, defect_whole=defect_whole,
+                         number_intersected_districts=number_intersected_districts,
+                         defect_intersected=defect_intersected))
 
     return data
 
 
 def calculate_defect(graph: nx.Graph, counties: Iterable[str]) -> int:
     county_defects = calculate_county_defects(graph, counties)
-    print([x for x in county_defects if (x.defect_whole + x.defect_intersected) > 0])
     return sum([(x.defect_whole + x.defect_intersected) for x in county_defects])
 
 
@@ -489,15 +473,14 @@ def extract_counties(county_district_graph: nx.Graph):
     return {node for node, data in county_district_graph.nodes(data=True) if data['bipartite'] == 0}
 
 
-def extract_defect_targets(county_district_graph: nx.Graph) -> (dict[str, int], dict[str, int]):
-    counties = extract_counties(county_district_graph)
+def extract_defect_targets(graph: nx.Graph) -> (dict[str, int], dict[str, int]):
+    counties = extract_counties(graph)
 
     whole_targets = {}
     intersect_targets = {}
     for county in counties:
-        whole_targets[county] = county_district_graph.nodes[county]['whole_target']
-        intersect_targets[county] = county_district_graph.nodes[county]['intersect_target']
-
+        whole_targets[county] = graph.nodes[county]['whole_target']
+        intersect_targets[county] = graph.nodes[county]['intersect_target']
     return whole_targets, intersect_targets
 
 
@@ -516,11 +499,15 @@ def build_county_district_graph(dual_graph: Graph, assignment: dict[str, int], w
         graph.nodes[county]['whole_target'] = whole_targets[county]
         graph.nodes[county]['intersect_target'] = intersect_targets[county]
 
+    set_bipartitite_flag(graph)
+
     return graph
 
 
 def update_county_district_graph(dual_graph: nx.Graph, county_district_graph: nx.Graph, old_assignment: dict[str, id],
                                  new_assignment: dict[str, id], copy_graph: bool) -> nx.Graph:
+    raise RuntimeError("Implementation does not work. FIXME before using.")
+
     updated_graph = copy.deepcopy(county_district_graph) if copy_graph else county_district_graph
 
     changed_counties = []
@@ -540,7 +527,7 @@ def update_county_district_graph(dual_graph: nx.Graph, county_district_graph: nx
     # Now go through new_assign, find new counties
     changed_counties_districts = zip(changed_counties, changed_districts)
     for district in unique_changed_districts:
-        new_counties = set([x for x, y in changed_counties_districts if y == district])
+        new_counties = {x for x, y in changed_counties_districts if y == district}
         for county in new_counties:
             updated_graph.add_edge(county, district)
 
@@ -563,23 +550,19 @@ def better_defect_accept(partition: Partition, state: dict[str, Any]):
     if partition.parent is None:
         return 1
 
-    graph = state['graph']
+    county_district_graph = build_county_district_graph(state['dual_graph'], partition.assignment,
+                                                        state['whole_targets'], state['intersect_targets'])
 
-    county_nodes = {node for node, data in graph.nodes(data=True) if data['bipartite'] == 0}
+    county_nodes = {node for node, data in county_district_graph.nodes(data=True) if data['bipartite'] == 0}
 
-    # old_defect = calculate_defect(county_district_graph, county_nodes)
     if 'initial_defect' not in state:
-        old_defect = calculate_defect(graph, county_nodes)
+        old_defect = calculate_defect(county_district_graph, county_nodes)
         state['initial_defect'] = old_defect
         print(f"Initial Defect: {old_defect}")
     else:
         old_defect = state['initial_defect']
 
-    parent_assignment = partition.parent.assignment
-    assignment = partition.assignment
-    updated_graph = update_county_district_graph(partition.graph, graph, parent_assignment, assignment,
-                                                 True)
-    new_defect = calculate_defect(updated_graph, county_nodes)
+    new_defect = calculate_defect(county_district_graph, county_nodes)
 
     bound = 1
     k = 3  # severity of penalizing defect
@@ -593,44 +576,70 @@ def better_defect_accept(partition: Partition, state: dict[str, Any]):
         state['plan_hashes'] = set()
     plan_hashes = state['plan_hashes']
 
-    if 'previous_parent' not in state:
-        state['previous_parent'] = []
-    previous_parent = state['previous_parent']
+    if 'previous_parents' not in state:
+        state['previous_parents'] = []
+    previous_parents = state['previous_parents']
+
+    if step_number % 2000 == 0:
+        print(f'{[old_defect, new_defect, bound, accept]} Number Plans: {len(plan_hashes)}')
 
     if accept:
-        # print(f"Accepted: {[old_defect,new_defect,bound,Qaccept]}")
-        state['graph'] = updated_graph
+        if np.random.random() < .01:
+            print(f"Accepted: {[old_defect, new_defect, bound, accept]}")
         plan_hash = calculate_plan_hash_from_partition(state['node_id_to_index'], partition)
         plan_hashes.add(plan_hash)
-        if len([x for x, y, z in previous_parent if x == plan_hash]) == 0:
-            previous_parent.append((plan_hash, partition, graph))
+        if len([x for x, y in previous_parents if x == plan_hash]) == 0:
+            previous_parents.append((plan_hash, partition))
+            if len(previous_parent) > 200:
+                previous_parent.pop(0)
         state['failures'] = 0
     else:
         if 'failures' not in state:
             state['failures'] = 0
         failures = state['failures']
 
-        go_back = (failures > 20) and (np.random.random() < .1)
-        if go_back and len(previous_parent) > 0:
-            _, previous_state, previous_graph = previous_parent.pop()
+        go_back = (failures > 30) and (np.random.random() < .1)
+        if go_back and len(previous_parents) > 0:
+            _, previous_state = previous_parents.pop()
             state['chain'].state = previous_state
-            print(f"Went Back: {len(previous_parent)}")
+            print(f"Went Back: {len(previous_parents)}")
             state['failures'] = 0
-            state['graph'] = previous_graph
         else:
             state['failures'] += 1
 
-    if step_number % 20 == 0:
-        print(f'{[old_defect, new_defect, bound, accept]} Number Plans: {len(plan_hashes)}')
-
     return accept
+
+
+def calculate_defects_iterative(dual_graph: nx.Graph, initial_assignment, whole_targets, intersect_targets,
+                                plans: Iterable[np.ndarray]):
+    previous_assignment = initial_assignment
+    defects = []
+    county_district_graph = None
+    counties = None
+    for i, plan in enumerate(plans):
+        if i % 1000 == 0:
+            print(i)
+
+        assignment = cm.build_assignment(dual_graph, plan)
+
+        if i == 0:
+            county_district_graph = build_county_district_graph(dual_graph, assignment, whole_targets,
+                                                                intersect_targets)
+            counties = extract_counties(county_district_graph)
+        else:
+            county_district_graph = update_county_district_graph(dual_graph, county_district_graph,
+                                                                 previous_assignment, assignment, False)
+        previous_assignment = assignment
+
+        defects.append(calculate_defect(county_district_graph, counties))
+    return defects
 
 
 # utilities
 
 
 def display_population_deviations(initial_partition):
-    ideal_population = calculate_idead_population(initial_partition)
+    ideal_population = calculate_ideal_population(initial_partition)
     print(len(initial_partition))
     print(ideal_population)
     populations = initial_partition["population"]
@@ -639,7 +648,7 @@ def display_population_deviations(initial_partition):
     print((numpy.min([x for x in populations.values()]) - ideal_population) / ideal_population)
 
 
-def calculate_idead_population(partition):
+def calculate_ideal_population(partition):
     return sum(partition["population"].values()) / len(partition)
 
 
@@ -651,53 +660,9 @@ def calculate_size(canonical_plans):
     return size
 
 
-def build_TXSN_random_seed_settings() -> Dict:
-    settings = Dict()
-    settings.networkX_graph_filename = 'TX_2020_cntyvtd_sldu_seed_1000000_graph.gpickle'
-    settings.epsilon = determine_population_limit('TXSN')
-    return settings
-
-
-def build_proposed_plan_settings(chamber: str, plan: int) -> Dict:
-    settings = Dict()
-    settings.networkX_graph_filename = f'graph_TX_2020_cntyvtd_{chamber}_{plan}.gpickle'
-    settings.redistricting_data_filename = f'nodes_TX_2020_cntyvtd_{chamber}_{plan}.parquet'
-    settings.country_district_graph_filename = f'adj_TX_2020_cntyvtd_{chamber}_{plan}.gpickle'
-    settings.epsilon = determine_population_limit(chamber)
-    return settings
-
-
-def calculate_defects(dual_graph, county_district_graph, plans):
-    previous_assignment = None
-    defects = []
-    counties = extract_counties(county_district_graph)
-    for i, plan in enumerate(plans):
-        if i % 1000 == 0:
-            print(i)
-
-        assignment = cm.build_assignment(dual_graph, plan)
-
-        if i == 0:
-            whole_targets, intersect_targets = extract_defect_targets(county_district_graph)
-            county_district_graph = build_county_district_graph(dual_graph, assignment, whole_targets,
-                                                                intersect_targets)
-        else:
-            county_district_graph = update_county_district_graph(dual_graph, county_district_graph,
-                                                                 previous_assignment, assignment, False)
-
-        previous_assignment = assignment
-
-        defects.append(calculate_defect(county_district_graph, counties))
-    return defects
-
-
 if __name__ == '__main__':
     def main():
         directory = 'C:/Users/rob/projects/election/rob/'
-
-        x = 0
-        ensemble_description = 'TXHD_2101_old_script_1'
-        plans = cm.load_plans(directory, ensemble_description, x * 10)
 
         if False:
             canonical_plans = set()
@@ -718,25 +683,9 @@ if __name__ == '__main__':
                 number_previous_canonical_plans = number_canonical_plans
 
         if False:
-            calculate_defects()
-
-        if False:
-            defects = []
-
-            for i, plan in enumerate(plans):
-                if i % 1000 == 0:
-                    print(i)
-
-                assignment = cm.build_assignment(dual_graph, plan)
-                whole_targets, intersect_targets = extract_defect_targets(graph)
-                county_district_graph = build_county_district_graph(dual_graph, assignment, whole_targets,
-                                                                    intersect_targets)
-                defects.append(calculate_defect(county_district_graph, counties))
-
-        if True:
             chamber = 'TXHD'
-            settings = build_proposed_plan_settings(chamber, 2176)
-            # settings = build_TXSN_random_seed_settings(),
+            # settings = cm.build_proposed_plan_simulation_settings(chamber, 2176)
+            settings = cm.build_TXSN_random_seed_simulation_settings()
 
             number_steps = 500000  # 300  #
 
@@ -746,6 +695,10 @@ if __name__ == '__main__':
             output_directory = cm.build_ensemble_directory(directory, ensemble_description)
 
             chain, elections = build_chain(chamber, directory, settings, number_steps)
-            run_chain(chain, elections, output_directory)
+            run_chain_impl(chain, elections, output_directory)
+
 
     main()
+
+
+# TODO Copy in random seed generation code
