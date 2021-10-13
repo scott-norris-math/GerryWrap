@@ -415,7 +415,16 @@ def save_graph(chamber: str, directory: str, plans_metadata: pd.DataFrame) -> No
 
     def build_multiline(s: str) -> str:
         s = s.replace("/", " ")
-        return "\n".join(s.split(" "))
+        elements = []
+        for element in s.split(" "):
+            if "," not in element:
+                elements.append(element)
+            else:
+                subelements = element.split(",")
+                chunk_size = 3
+                chunks = [subelements[x:x + chunk_size] for x in range(0, len(subelements), chunk_size)]
+                elements.append("\n".join(f"{','.join(chunk)}" for chunk in chunks))
+        return "\n".join(elements)
 
     previous_plans = set(plans_metadata['previous_plan'])
     max_ammendments = plans_metadata.filter(['plan', 'submitter', 'previous_plan']). \
@@ -441,7 +450,7 @@ def save_graph(chamber: str, directory: str, plans_metadata: pd.DataFrame) -> No
     admissible_metadata = [x for x in plans_metadata.itertuples() if x.plan in proposed_plans_graph.nodes]
     submitters = {x.submitter: parse_submitter(x.submitter) for x in admissible_metadata}
 
-    layout = 'neato' if chamber == 'TXHD' else 'dot'
+    layout = 'fdp' if chamber == 'TXHD' else 'dot'
     pos = nx.nx_pydot.graphviz_layout(proposed_plans_graph, prog=layout)
     labels = {x.plan: f"{x.plan}\n{build_multiline(submitters[x.submitter][1])}" for x in admissible_metadata}
     node_colors = [determine_node_color(submitters[x.submitter], party_lookup,
@@ -449,8 +458,14 @@ def save_graph(chamber: str, directory: str, plans_metadata: pd.DataFrame) -> No
                                         max_ammendments.get((x.submitter, x.previous_plan)) == x.plan)
                    for x in admissible_metadata]
 
-    fig, ax = plt.subplots(figsize=(22, 8))
-    nx.draw_networkx(proposed_plans_graph, pos, node_size=5500, labels=labels, node_color=node_colors)
+    if chamber == 'TXHD':
+        height = 16
+        node_size = 4500
+    else:
+        height = 8
+        node_size = 5500
+    fig, ax = plt.subplots(figsize=(22, height))
+    nx.draw_networkx(proposed_plans_graph, pos, node_size=node_size, labels=labels, node_color=node_colors)
     edge_labels = {x: "{:,}".format(y) for x, y in nx.get_edge_attributes(proposed_plans_graph, 'weight').items()}
     nx.draw_networkx_edge_labels(proposed_plans_graph, pos, edge_labels=edge_labels)
 
@@ -459,30 +474,25 @@ def save_graph(chamber: str, directory: str, plans_metadata: pd.DataFrame) -> No
     pylab.savefig(build_graph_path(chamber, directory))
 
 
-def build_party_lookup(directory):
-    def normalize(elements):
+def build_party_lookup(directory: str) -> dict[str, dict[str, str]]:
+    def normalize(elements: list[str]) -> tuple[str, str]:
         name_parts = [x for x in elements if x.removesuffix(".") not in ["Jr", "III"]]
-        return [name_parts[0], name_parts[-1]]
+        return name_parts[0], name_parts[-1]
 
-    def build_chamber_party_lookup(chamber, directory):
+    def build_chamber_party_lookup(chamber: str, directory: str):
         legislator_lookup = pd.read_csv(f'{directory}{chamber}PartyLookup.csv')
-        # print(legislator_lookup['Name'])
         split_names = [normalize(x.split(' ')) for x in legislator_lookup['Name'] if x != 'Vacant']
         names = [(elements[0], elements[1]) for elements in split_names]
-        # print(f'Names: {names}')
         names_grouped = cm.groupby_project(names,
                                            lambda x: x[1], lambda x: x[0])
-        # print(f'Names Grouped: {names_grouped}')
+
         single_name_mapping = {(y[0] + ' ' + x): x.upper() for x, y in names_grouped if len(y) == 1}
-        # print(f'Single Name: {single_name_mapping}')
         repeated_name_mapping = {(first_name + ' ' + x): (first_name[0] + ' ' + x).upper() for x, y in names_grouped if
                                  len(y) >= 2 for first_name in y}
-        # print(repeated_name_mapping)
+
         name_lookup = {**single_name_mapping, **repeated_name_mapping}
-        # print(name_lookup)
-        party_lookup = {name_lookup[' '.join(normalize(x.split(' ')))]: y[0] for x, y in
-                        zip(legislator_lookup['Name'], legislator_lookup['Party']) if x != 'Vacant'}
-        return party_lookup
+        return {name_lookup[' '.join(normalize(x.split(' ')))]: y[0] for x, y in
+                zip(legislator_lookup['Name'], legislator_lookup['Party']) if x != 'Vacant'}
 
     return {chamber: build_chamber_party_lookup(chamber, directory) for chamber in cm.CHAMBERS}
 
@@ -592,8 +602,10 @@ def extract_graph_block_assignments(graph):
 
 def save_graph_filtered(chamber, root_directory, proposed_plans_metadata):
     proposed_plans_metadata = proposed_plans_metadata[proposed_plans_metadata['plan'] != 2100]
-    if chamber=='TXHD':
-        proposed_plans_metadata = proposed_plans_metadata[proposed_plans_metadata['plan'] >= 2176]
+    if chamber == 'TXHD':
+        proposed_plans_metadata = proposed_plans_metadata[(proposed_plans_metadata['plan'] >= 2176) & (
+                (proposed_plans_metadata['previous_plan'] >= 2176) | (
+                proposed_plans_metadata['previous_plan'] == 0))]
     save_graph(chamber, root_directory, proposed_plans_metadata)
 
 
@@ -608,7 +620,7 @@ if __name__ == '__main__':
         root_directory = 'C:/Users/rob/projects/election/rob/'
         plans_directory = build_plans_directory(root_directory)
 
-        if True:
+        if False:
             # process_tabblock_data(chamber, root_directory)
             update_plan_vectors(chamber, root_directory)
 
@@ -625,11 +637,11 @@ if __name__ == '__main__':
             plans_metadata = load_plans_metadata(chamber, plans_directory)
             save_current_merged_plans(chamber, root_directory, plans_metadata, force=True)
 
-        if False:
-            for chamber in ['TXHD']: # cm.CHAMBERS:
+        if True:
+            for chamber in ['TXHD']:  # cm.CHAMBERS:
                 proposed_plans_metadata = load_plans_metadata(chamber, plans_directory)
                 save_graph_filtered(chamber, root_directory, proposed_plans_metadata)
-            #pylab.show()
+            # pylab.show()
 
         if False:
             save_plan_vectors(chamber, root_directory, 2101)

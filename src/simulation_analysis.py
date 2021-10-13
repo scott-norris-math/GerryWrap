@@ -43,7 +43,7 @@ def build_region_plans_path(ensemble_directory: str, region: str) -> str:
     return f'{ensemble_directory}/{region}_plans.npz'
 
 
-def verify_uniqueness(region_plans_lookup) -> None:
+def verify_uniqueness(region_plans_lookup: dict[str, np.ndarray]) -> None:
     for region, region_plans in region_plans_lookup.items():
         print(region)
         previous_unique_districts = None

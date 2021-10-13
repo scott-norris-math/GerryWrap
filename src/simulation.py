@@ -13,7 +13,7 @@ import networkx as nx
 from datetime import datetime
 from shapely import wkt
 from collections import defaultdict
-from typing import Iterable, Any, NamedTuple
+from typing import Iterable, Any, NamedTuple, Callable
 import pickle
 from addict import Dict
 import math
@@ -24,7 +24,7 @@ import data_transform as dt
 import proposed_plans as pp
 
 
-def build_canonical_partition_list(partition: Partition):
+def build_canonical_partition_list(partition: Partition) -> list[list[int]]:
     partition_assignment = [(x, partition.assignment[x]) for x in partition.graph.nodes]
     return dt.build_canonical_assignments_list(partition_assignment)
 
@@ -40,7 +40,7 @@ def calculate_plan_hash_from_partition(node_id_to_index: dict[str, int], partiti
     return hash(build_canonical_plan_from_partition(node_id_to_index, partition))
 
 
-def display_partition(initial_partition: Partition, partition: Partition):
+def display_partition(initial_partition: Partition, partition: Partition) -> None:
     for x in partition.graph.nodes:
         print([x, initial_partition.assignment[x], partition.assignment[x]])
 
@@ -131,7 +131,7 @@ def join_data_to_dual_graph(graph: Graph, data: pd.DataFrame) -> None:
     graph.join(data, columns=['black_o17_sum', 'black_nonhisp_o17_sum'], right_index='geoid')
 
 
-def build_updaters():
+def build_updaters() -> tuple[dict[str, updaters], Iterable[Election]]:
     updaters_dict = {"population": updaters.Tally("total_pop", alias="population"),
                      "countysplits": updaters.county_splits("countysplits", "county"),
                      "o17_hisp_pop": updaters.Tally("o17_hisp_pop"),
@@ -149,14 +149,14 @@ def build_updaters():
     return updaters_dict, elections
 
 
-def build_assignment_column(chamber: str, is_plan_proposal: bool):
+def build_assignment_column(chamber: str, is_plan_proposal: bool) -> str:
     if not is_plan_proposal:
         return dt.get_census_chamber_name(chamber)
     else:
         return 'district'
 
 
-def load_county_district_graph(directory, filename):
+def load_county_district_graph(directory: str, filename: str) -> nx.Graph:
     seeds_directory = cm.build_seeds_directory(directory)
     graph = nx.read_gpickle(f'{seeds_directory}{filename}')
     set_bipartitite_flag(graph)
@@ -291,15 +291,15 @@ def run_chain_impl(chain: MarkovChain, elections: Iterable[Election], output_dir
     save_partial_plans(output_directory, plans_array, plans_output_size, step_number)
 
 
-def build_node_id_to_index_from_strings(strings: Iterable[str]):
+def build_node_id_to_index_from_strings(strings: Iterable[str]) -> dict[str, int]:
     return {x: i for i, x in enumerate(sorted(strings))}
 
 
-def build_node_id_to_index(partition: Partition):
+def build_node_id_to_index(partition: Partition) -> dict[str, int]:
     return build_node_id_to_index_from_strings(partition.assignment)
 
 
-def save_columns_map(output_directory: str, node_id_to_index: dict[str, int]):
+def save_columns_map(output_directory: str, node_id_to_index: dict[str, int]) -> None:
     outfile = open(f'{output_directory}/columns_map.pickle', 'wb')
     pickle.dump(node_id_to_index, outfile)
     outfile.close()
@@ -469,7 +469,7 @@ def set_bipartitite_flag(county_district_graph: nx.Graph) -> None:
             node['bipartite'] = 1
 
 
-def extract_counties(county_district_graph: nx.Graph):
+def extract_counties(county_district_graph: nx.Graph) -> set[str]:
     return {node for node, data in county_district_graph.nodes(data=True) if data['bipartite'] == 0}
 
 
@@ -484,7 +484,7 @@ def extract_defect_targets(graph: nx.Graph) -> (dict[str, int], dict[str, int]):
     return whole_targets, intersect_targets
 
 
-def build_county_district_graph(dual_graph: Graph, assignment: dict[str, int], whole_targets: dict[str, int],
+def build_county_district_graph(dual_graph: nx.Graph, assignment: dict[str, int], whole_targets: dict[str, int],
                                 intersect_targets: dict[str, int]) -> nx.Graph:
     graph = nx.Graph()
 
@@ -534,7 +534,7 @@ def update_county_district_graph(dual_graph: nx.Graph, county_district_graph: nx
     return updated_graph
 
 
-def build_accept_function(state: dict[str, Any]):
+def build_accept_function(state: dict[str, Any]) -> Callable:
     return lambda x: better_defect_accept(x, state)
 
 
@@ -610,8 +610,8 @@ def better_defect_accept(partition: Partition, state: dict[str, Any]):
     return accept
 
 
-def calculate_defects_iterative(dual_graph: nx.Graph, initial_assignment, whole_targets, intersect_targets,
-                                plans: Iterable[np.ndarray]):
+def calculate_defects_iterative(dual_graph: nx.Graph, initial_assignment: dict[str, int], whole_targets: dict[str, int],
+                                intersect_targets: dict[str, int], plans: Iterable[np.ndarray]) -> list[int]:
     previous_assignment = initial_assignment
     defects = []
     county_district_graph = None
@@ -638,7 +638,7 @@ def calculate_defects_iterative(dual_graph: nx.Graph, initial_assignment, whole_
 # utilities
 
 
-def display_population_deviations(initial_partition):
+def display_population_deviations(initial_partition: Partition) -> None:
     ideal_population = calculate_ideal_population(initial_partition)
     print(len(initial_partition))
     print(ideal_population)
@@ -648,11 +648,11 @@ def display_population_deviations(initial_partition):
     print((numpy.min([x for x in populations.values()]) - ideal_population) / ideal_population)
 
 
-def calculate_ideal_population(partition):
+def calculate_ideal_population(partition: Partition) -> None:
     return sum(partition["population"].values()) / len(partition)
 
 
-def calculate_size(canonical_plans):
+def calculate_size(canonical_plans: Iterable[frozenset[frozenset]]) -> int:
     size = 0
     for plan in canonical_plans:
         for district_group in plan:

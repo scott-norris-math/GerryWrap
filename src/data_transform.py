@@ -4,6 +4,7 @@ from collections import defaultdict
 import pandas as pd
 from typing import Callable, Iterable
 import networkx as nx
+import numpy as np
 
 import common as cm
 from timer import Timer
@@ -143,12 +144,10 @@ def build_statistics_settings() -> list[tuple[str, Callable[[pd.DataFrame], pd.S
 
 
 def build_canonical_assignments_list(assignments: list[tuple[int, int]]) -> list[list[int]]:
-    # print(assignments)
     partition_dictionary = defaultdict(list)
     for unit, district in assignments:
         partition_dictionary[district].append(unit)
     partition_list = [sorted(x) for x in partition_dictionary.values()]
-    # print(partition_list)
     partition_list.sort(key=lambda x: x[0])
     return partition_list
 
@@ -230,12 +229,9 @@ def save_ensemble_matrices(chamber: str, directory: str, redistricting_data_file
         np.savez_compressed(f'{ensemble_directory}{statistic}.npz', ensemble_matrix)
 
 
-def save_unique_plans(directory: str, ensemble_description: str, max_file_number) -> None:
-    plans = cm.load_plans_from_files(directory, ensemble_description, range(0, max_file_number + 1))
+def save_unique_plans(ensemble_directory, plans: np.ndarray) -> None:
     unique_plans = cm.determine_unique_plans(plans)
     print(f"Number Unique Plans: {len(unique_plans)}")
-
-    ensemble_directory = cm.build_ensemble_directory(directory, ensemble_description)
     np.savez_compressed(f'{ensemble_directory}/unique_plans.npz', np.array(unique_plans))
 
 
@@ -281,7 +277,9 @@ if __name__ == '__main__':
 
         if False:
             ensemble_description = 'TXHD_2176_Reduced_3'
-            save_unique_plans(directory, ensemble_description, 12)
+            plans = cm.load_plans_from_files(directory, ensemble_description, 12)
+            ensemble_directory = cm.build_ensemble_directory(directory, ensemble_description)
+            save_unique_plans(ensemble_directory, plans)
 
         if False:
             settings = si.build_TXSN_random_seed_settings()

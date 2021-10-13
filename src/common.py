@@ -2,7 +2,7 @@ import csv
 import zipfile
 from collections import defaultdict
 from itertools import groupby
-from typing import Callable, Any
+from typing import Iterable, Callable, Any
 import numpy as np
 import gerrychain
 import pickle
@@ -24,7 +24,7 @@ def load_plans_from_file(directory: str, ensemble_description: str, plans_filena
     return load_plans_from_path(f'{directory}ensembles/ensemble_{ensemble_description}/{plans_filename}')
 
 
-def load_plans_from_files(directory, ensemble_description, file_numbers):
+def load_plans_from_files(directory: str, ensemble_description: str, file_numbers: list[int]) -> np.ndarray:
     return np.concatenate([load_plans(directory, ensemble_description, x) for x in file_numbers])
 
 
@@ -57,7 +57,7 @@ def load_ensemble_matrix_sorted_transposed(input_directory: str, statistic_name:
     return load_ensemble_matrix_sorted_transposed_from_path(path)
 
 
-def load_ensemble_matrix_sorted_transposed_from_path(path):
+def load_ensemble_matrix_sorted_transposed_from_path(path: str) -> np.ndarray:
     ensemble_matrix = load_numpy_compressed(path)
     for row in ensemble_matrix:
         row.sort()
@@ -84,7 +84,7 @@ def load_plan_vectors(chamber: str, input_directory: str, statistic_name: str, p
     return plan_vectors
 
 
-def build_seeds_directory(directory):
+def build_seeds_directory(directory: str) -> str:
     return f'{directory}seeds/'
 
 
@@ -92,9 +92,8 @@ def build_ensemble_directory(directory: str, ensemble_description: str) -> str:
     return f'{directory}ensembles/ensemble_{ensemble_description}/'
 
 
-def build_ensemble_description(chamber: str, seed_description: str, ensemble_number: int):
-    suffix = f'{chamber}_{seed_description}_{ensemble_number}'
-    return suffix
+def build_ensemble_description(chamber: str, seed_description: str, ensemble_number: int) -> str:
+    return f'{chamber}_{seed_description}_{ensemble_number}'
 
 
 def encode_chamber_character(chamber: str) -> str:
@@ -209,17 +208,17 @@ def count_groups(l: list) -> dict:
     return counts
 
 
-def groupby_project(iterable, key, projection):
+def groupby_project(iterable, key: Callable, projection: Callable) -> list:
     sorted = iterable.copy()
     sorted.sort(key=key)
     return [(x, [projection(z) for z in y]) for x, y in groupby(sorted, key)]
 
 
-def to_dict(l):
+def to_dict(l: list) -> dict:
     return {x: y for x, y in l}
 
 
-def join_dict(d1, d2):
+def join_dict(d1: dict, d2: dict) -> dict:
     return {x: (y, d2[x]) for x, y in d1.items()}
 
 
@@ -236,7 +235,7 @@ def load_pickle(path: str) -> Any:
     return object
 
 
-def get_current_ensemble(chamber):
+def get_current_ensemble(chamber: str) -> tuple[str, int]:
     if chamber == 'USCD':
         seed_description = 'random_seed'
         ensemble_number = 2
@@ -252,7 +251,7 @@ def get_current_ensemble(chamber):
     return seed_description, ensemble_number
 
 
-def determine_population_limit(chamber: str):
+def determine_population_limit(chamber: str) -> float:
     return {
         'USCD': .01,
         'TXSN': .02,

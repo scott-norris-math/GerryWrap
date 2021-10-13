@@ -64,8 +64,8 @@ def build_plan_label(chamber, plan) -> str:
     return f"Proposed {cm.encode_chamber_character(chamber)}{plan}"
 
 
-def save_election_plots(chamber: str, root_directory: str, ensemble_directory: str, plots_directory: str, current_plan,
-                        comparison_plans, plan_pnums, plan_legend_names, plan_colors):
+def save_election_plots(chamber: str, root_directory: str, ensemble_directory: str, plots_directory: str,
+                        current_plan: int, comparison_plans, plan_pnums, plan_legend_names, plan_colors):
     for election in get_elections():
         print(election)
 
@@ -474,14 +474,14 @@ if __name__ == '__main__':
     def main():
         directory = 'C:/Users/rob/projects/election/rob/'
 
-        chamber = 'USCD'  #'TXHD'  # 'TXSN'  #
+        chamber = 'TXHD'  # 'TXSN'  # 'USCD'  #
         seed_description, ensemble_number = cm.get_current_ensemble(chamber)
 
         if True:
             current_plan = 2100
             #comparison_plans = sorted(
             #    list(pp.get_valid_plans(chamber, pp.build_plans_directory(directory)) - {2100}), reverse=True)
-            comparison_plans = [2135]
+            comparison_plans = [2315]
 
             save_plots(chamber, directory, seed_description, ensemble_number, current_plan, comparison_plans)
 
