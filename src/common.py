@@ -12,6 +12,10 @@ from addict import Dict
 CHAMBERS = ['TXSN', 'USCD', 'TXHD']
 
 
+def build_suffix(suffix: str) -> str:
+    return '' if suffix == '' else f'_{suffix}'
+
+
 def load_plans_from_path(path: str) -> np.ndarray:
     return np.load(path)['arr_0']
 
@@ -24,7 +28,7 @@ def load_plans_from_file(directory: str, ensemble_description: str, plans_filena
     return load_plans_from_path(f'{directory}ensembles/ensemble_{ensemble_description}/{plans_filename}')
 
 
-def load_plans_from_files(directory: str, ensemble_description: str, file_numbers: list[int]) -> np.ndarray:
+def load_plans_from_files(directory: str, ensemble_description: str, file_numbers: Iterable[int]) -> np.ndarray:
     return np.concatenate([load_plans(directory, ensemble_description, x) for x in file_numbers])
 
 
@@ -72,7 +76,7 @@ def load_numpy_compressed(path: str) -> np.ndarray:
     return np.load(path)['arr_0']
 
 
-def load_plan_vectors(chamber: str, input_directory: str, statistic_name: str, plans: list[int]) -> dict[
+def load_plan_vectors(chamber: str, input_directory: str, statistic_name: str, plans: Iterable[int]) -> dict[
     int, np.ndarray]:
     plan_vectors = {}
     for plan in plans:
@@ -222,9 +226,9 @@ def join_dict(d1: dict, d2: dict) -> dict:
     return {x: (y, d2[x]) for x, y in d1.items()}
 
 
-def save_pickle(path: str, object: Any) -> None:
+def save_pickle(path: str, obj: Any) -> None:
     outfile = open(path, 'wb')
-    pickle.dump(object, outfile)
+    pickle.dump(obj, outfile)
     outfile.close()
 
 

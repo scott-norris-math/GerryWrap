@@ -6,6 +6,10 @@ import pandas as pd
 import random
 import pickle
 from datetime import datetime
+import networkx.algorithms.bipartite.matching as ma
+from scipy import stats
+import random
+import matplotlib.pyplot as plt
 
 import simulation as si
 import common as cm
@@ -208,6 +212,5 @@ if __name__ == '__main__':
 
 
     main()
-
 
 # TODO Translate graph making code

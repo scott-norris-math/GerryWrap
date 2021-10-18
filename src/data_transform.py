@@ -119,8 +119,7 @@ def build_race_filename_prefix(race: str) -> str:
 
 
 def build_race_filename_csv(race: str, suffix: str = '') -> str:
-    suffix = '' if suffix == '' else '_' + suffix
-    return build_race_filename_prefix(race) + suffix + '.csv'
+    return build_race_filename_prefix(race) + cm.build_suffix(suffix) + '.csv'
 
 
 def build_election_filename_prefix(election: str) -> str:
@@ -128,8 +127,7 @@ def build_election_filename_prefix(election: str) -> str:
 
 
 def build_election_filename_csv(election: str, suffix: str = '') -> str:
-    suffix = '' if suffix == '' else '_' + suffix
-    return build_election_filename_prefix(election) + suffix + '.csv'
+    return build_election_filename_prefix(election) + cm.build_suffix(suffix) + '.csv'
 
 
 def build_statistics_settings() -> list[tuple[str, Callable[[pd.DataFrame], pd.Series]]]:
@@ -282,7 +280,7 @@ if __name__ == '__main__':
             save_unique_plans(ensemble_directory, plans)
 
         if False:
-            settings = si.build_TXSN_random_seed_settings()
+            settings = cm.build_TXSN_random_seed_simulation_settings()
 
             seeds_directory = cm.build_seeds_directory(directory)
             networkX_graph = nx.read_gpickle(seeds_directory + settings.networkX_graph_filename)

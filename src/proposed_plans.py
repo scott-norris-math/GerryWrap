@@ -144,7 +144,6 @@ def save_merged_plans(chamber: str, directory: str, source_plan: int, diff_plan:
     output_path = build_plan_path(chamber, directory, diff_plan)
     merged_plan.to_csv(output_path)
 
-    # plans_metadata = load_plans_metadata(chamber, build_plans_directory(directory))
     plans_metadata.at[diff_plan, 'changed_rows'] = number_changed_rows
     save_plans_metadata(chamber, build_plans_directory(directory), plans_metadata)
 
@@ -248,7 +247,7 @@ def save_vector_file(chamber: str, df: pd.DataFrame, path: str,
     cm.save_vector_csv(path, statistics_list)
 
 
-def save_plan_vectors(chamber: str, directory: str, plan: int):
+def save_plan_vectors(chamber: str, directory: str, plan: int) -> None:
     plan_df = pd.read_parquet(build_plan_data_path(chamber, directory, plan, 'parquet'))
     output_directory = build_plan_vectors_directory(chamber, directory, plan)
     ut.ensure_directory_exists(output_directory)
@@ -464,7 +463,7 @@ def save_graph(chamber: str, directory: str, plans_metadata: pd.DataFrame) -> No
     else:
         height = 8
         node_size = 5500
-    fig, ax = plt.subplots(figsize=(22, height))
+    fig, ax = plt.subplots(figsize=(26, height))
     nx.draw_networkx(proposed_plans_graph, pos, node_size=node_size, labels=labels, node_color=node_colors)
     edge_labels = {x: "{:,}".format(y) for x, y in nx.get_edge_attributes(proposed_plans_graph, 'weight').items()}
     nx.draw_networkx_edge_labels(proposed_plans_graph, pos, edge_labels=edge_labels)
@@ -567,13 +566,13 @@ def analyze_proposed_plan_seed_assignments_v2(chamber: str, directory: str, plan
     print(sorted(different_populations, key=lambda x: x[4]))
 
 
-def verify_graph(chamber, directory, plan):
+def verify_graph(chamber: str, directory: str, plan: int) -> None:
     graph = nx.read_gpickle(f'{directory}seeds/graph_TX_2020_cntyvtd_{chamber}_{plan}_Reduced.gpickle')
     print(f"Connected Components: {nx.number_connected_components(graph)}")
     print([x for x, y in graph.degree() if y == 1])
 
 
-def load_nodes_raw_filtered(directory):
+def load_nodes_raw_filtered(directory: str) -> pd.DataFrame:
     filtered_filename = 'nodes_raw_filtered.parquet'
     filtered_path = build_redistricting_data_calculated_directory(directory) + filtered_filename
     if not os.path.exists(filtered_path):
@@ -590,23 +589,25 @@ def load_nodes_raw_filtered(directory):
     return node_data
 
 
-def extract_graph_block_assignments(graph):
-    block_assignments = [(geoid, int(district), key) for key, node in graph.nodes.items()
-                         for geoid, district in
-                         zip(node['node_geoids'].split(','), node['node_districts'].split(','))]
-    # print(block_assignments)
-    # reassigned_blocks = [geoid for geoid, district, key, node in block_assignments if district != node['district']]
-    # print(len(reassigned_blocks) / len(block_assignments))
-    return block_assignments
+def extract_graph_block_assignments(graph: nx.Graph) -> list[tuple[str, int, str]]:
+    return [(geoid, int(district), key) for key, node in graph.nodes.items()
+            for geoid, district in
+            zip(node['node_geoids'].split(','), node['node_districts'].split(','))]
 
 
-def save_graph_filtered(chamber, root_directory, proposed_plans_metadata):
+def save_graph_filtered(chamber: str, directory: str, proposed_plans_metadata: pd.DataFrame) -> None:
+    def filter_plans(proposed_plans_metadata, min_plan):
+        return proposed_plans_metadata[(proposed_plans_metadata['plan'] >= min_plan) & (
+                (proposed_plans_metadata['previous_plan'] >= min_plan) | (
+                proposed_plans_metadata['previous_plan'] == 0))]
+
     proposed_plans_metadata = proposed_plans_metadata[proposed_plans_metadata['plan'] != 2100]
     if chamber == 'TXHD':
-        proposed_plans_metadata = proposed_plans_metadata[(proposed_plans_metadata['plan'] >= 2176) & (
-                (proposed_plans_metadata['previous_plan'] >= 2176) | (
-                proposed_plans_metadata['previous_plan'] == 0))]
-    save_graph(chamber, root_directory, proposed_plans_metadata)
+        proposed_plans_metadata = filter_plans(proposed_plans_metadata, 2176)
+    elif chamber == 'USCD':
+        proposed_plans_metadata = filter_plans(proposed_plans_metadata, 2135)
+
+    save_graph(chamber, directory, proposed_plans_metadata)
 
 
 if __name__ == '__main__':
@@ -616,13 +617,14 @@ if __name__ == '__main__':
         t = Timer()
         t.start()
 
-        chamber = 'TXHD'  # 'TXSN'  # 'USCD'
+        chamber = 'TXSN'  # 'USCD'  #  'TXHD'  #
         root_directory = 'C:/Users/rob/projects/election/rob/'
         plans_directory = build_plans_directory(root_directory)
 
         if False:
             # process_tabblock_data(chamber, root_directory)
-            update_plan_vectors(chamber, root_directory)
+            for chamber in cm.CHAMBERS:
+                update_plan_vectors(chamber, root_directory)
 
         if False:
             pd.set_option('display.width', 500)
@@ -638,7 +640,7 @@ if __name__ == '__main__':
             save_current_merged_plans(chamber, root_directory, plans_metadata, force=True)
 
         if True:
-            for chamber in ['TXHD']:  # cm.CHAMBERS:
+            for chamber in cm.CHAMBERS:  # ['USCD']:  #
                 proposed_plans_metadata = load_plans_metadata(chamber, plans_directory)
                 save_graph_filtered(chamber, root_directory, proposed_plans_metadata)
             # pylab.show()

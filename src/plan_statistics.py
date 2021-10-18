@@ -1,5 +1,8 @@
 import os
 import numpy as np
+import scipy.stats as stats
+from addict import Dict
+from typing import Callable, Iterable
 
 import common as cm
 import data_transform as dt
@@ -26,8 +29,8 @@ def calculate_partisan_bias(plan_vector: np.ndarray) -> float:
     return number_seats1 - number_seats2
 
 
-def determine_statements(chamber: str, mm_ensemble: np.ndarray, pb_ensemble: np.ndarray, plans: list[int],
-                         plan_vectors: dict[int: np.ndarray]) -> list[str]:
+def determine_statements_v1(chamber: str, mm_ensemble: np.ndarray, pb_ensemble: np.ndarray, plans: list[int],
+                            plan_vectors: dict[int: np.ndarray]) -> list[str]:
     mm_ensemble_median = np.median(mm_ensemble)
     pb_ensemble_median = np.median(pb_ensemble)
 
@@ -135,46 +138,206 @@ def determine_plans(chamber: str, directory: str) -> list[int]:
     return plans
 
 
-def save_statistics(chamber: str, directory: str, ensemble_statistics: (np.ndarray, np.ndarray),
-                    file_prefix: str, plans):
+def save_statistics_statements(chamber: str, directory: str, ensemble_statistics: (np.ndarray, np.ndarray),
+                               file_prefix: str, plans) -> None:
     plans = sorted(list(plans))
     ensemble_mean_median, ensemble_partisan_bias = ensemble_statistics[chamber]
     plan_vectors = cm.load_plan_vectors(chamber, directory, file_prefix, plans)
-    statements = determine_statements(chamber, ensemble_mean_median, ensemble_partisan_bias, plans, plan_vectors)
+
+    ensemble_statistics, plan_statistics_list = calculate_statistics(chamber, ensemble_mean_median,
+                                                                     ensemble_partisan_bias, plans, plan_vectors)
+    statements = determine_statements(ensemble_statistics, plan_statistics_list)
     cm.save_all_text("\n".join(statements), f'{directory}statistics_{chamber}.txt')
+
+
+def calculate_statistics(chamber: str, mm_ensemble: np.ndarray, pb_ensemble: np.ndarray, plans: Iterable[int],
+                         plan_vectors: dict[int: np.ndarray]) -> tuple[Dict, list[Dict]]:
+    mm_ensemble_median = np.median(mm_ensemble)
+    pb_ensemble_median = np.median(pb_ensemble)
+
+    ensemble_statistics = Dict()
+    ensemble_statistics.mm_ensemble_min = min(mm_ensemble)
+    ensemble_statistics.mm_ensemble_median = mm_ensemble_median
+    ensemble_statistics.mm_ensemble_max = max(mm_ensemble)
+    ensemble_statistics.pb_ensemble_min = min(pb_ensemble)
+    ensemble_statistics.pb_ensemble_median = pb_ensemble_median
+    ensemble_statistics.pb_ensemble_max = max(pb_ensemble)
+
+    ensemble_statistics.mm_ensemble_median_percentile = stats.percentileofscore(mm_ensemble, mm_ensemble_median, kind='mean')
+    ensemble_statistics.pb_ensemble_median_percentile = stats.percentileofscore(pb_ensemble, pb_ensemble_median, kind='mean')
+
+    number_ensemble_plans = len(mm_ensemble)
+    ensemble_statistics.number_ensemble_plans = number_ensemble_plans
+    plan_statistics_list = []
+    for plan in plans:
+        plan_statistics = Dict()
+        plan_statistics.plan_name = f'{cm.encode_chamber_character(chamber)}{plan}'
+
+        plan_vector = plan_vectors[plan]
+
+        mm_plan = calculate_mean_median(plan_vector)
+        mm_portion = np.count_nonzero(mm_plan <= mm_ensemble) / number_ensemble_plans
+        plan_statistics.mm_plan = mm_plan
+        plan_statistics.mm_portion = mm_portion
+
+        pb_plan = calculate_partisan_bias(plan_vector)
+        pb_less_than_portion = np.count_nonzero(pb_plan < pb_ensemble) / number_ensemble_plans
+        pb_equals_portion = np.count_nonzero(pb_plan == pb_ensemble) / number_ensemble_plans
+        plan_statistics.pb_plan = pb_plan
+        plan_statistics.pb_less_than_portion = pb_less_than_portion
+        plan_statistics.pb_equals_portion = pb_equals_portion
+        plan_statistics.pb_percentile = stats.percentileofscore(pb_ensemble, pb_plan, kind='mean')
+
+        if mm_plan > mm_ensemble_median:
+            if pb_plan < pb_ensemble_median:
+                plan_statistics.bias = 'R'
+                ckPlg = 1
+            else:
+                plan_statistics.bias = 'N'
+                ckPlg = 0
+        else:
+            if pb_plan > pb_ensemble_median:
+                plan_statistics.bias = 'D'
+                ckPlg = -1
+            else:
+                plan_statistics.bias = 'N'
+                ckPlg = 0
+        plan_statistics.ckPlg = ckPlg
+
+        # Here, how we quantify how gerrymandered it is should depend on where it
+        #   lives WRT two metrics
+        # If overall plan favors R, we check in that direction
+        # If overall plan favors D, we check in that direction
+        if ckPlg == 1:
+            plan_statistics.less_gerrymandered_than = np.count_nonzero(
+                np.logical_and(mm_ensemble >= mm_plan, pb_ensemble < pb_plan))
+        elif ckPlg == -1:
+            plan_statistics.less_gerrymandered_than = np.count_nonzero(
+                np.logical_and(mm_ensemble <= mm_plan, pb_ensemble > pb_plan))
+
+        plan_statistics_list.append(plan_statistics)
+
+    return ensemble_statistics, plan_statistics_list
+
+
+def determine_statements(ensemble_statistics: Dict, plan_statistics_list: list[Dict]) -> list[str]:
+    statements = build_ensemble_statistics_statements(ensemble_statistics)
+
+    for plan_statistics in plan_statistics_list:
+        statements.append(plan_statistics.plan_name)
+
+        statements.append(plan_statistics.plan_name + ": MM = " + str(plan_statistics.mm_plan)
+                          + " is <= %6.6f" % plan_statistics.mm_portion
+                          + " and is > %6.6f" % (1 - plan_statistics.mm_portion))
+
+        statements.append(plan_statistics.plan_name + ": PB = " + str(plan_statistics.pb_plan)
+                          + " is < %6.6f" % plan_statistics.pb_less_than_portion
+                          + ", is == %6.6f" % plan_statistics.pb_equals_portion
+                          + ", and is > %6.6f" % (
+                                  1 - plan_statistics.pb_less_than_portion - plan_statistics.pb_equals_portion))
+
+        if plan_statistics.ckPlg == 1:
+            statements.append(plan_statistics.plan_name + " favors Republicans")
+        elif plan_statistics.ckPlg == 0:
+            statements.append(plan_statistics.plan_name + " is ambiguous")
+        elif plan_statistics.ckPlg == -1:
+            statements.append(plan_statistics.plan_name + " favors Democrats")
+        else:
+            raise RuntimeError("Unhandled ckPlg")
+
+        # Here, how we quantify how gerrymandered it is should depend on where it
+        #   lives WRT two metrics
+        # If overall plan favors R, we check in that direction
+        # If overall plan favors D, we check in that direction
+        if plan_statistics.ckPlg != 0:
+            statements.append(plan_statistics.plan_name + " is LESS gerrymandered than "
+                              + str(plan_statistics.less_gerrymandered_than) + " out of "
+                              + str(ensemble_statistics.number_ensemble_plans) + " plans")
+
+        statements.append("\n")
+
+    return statements
+
+
+def build_ensemble_statistics_statements(ensemble_statistics: Dict) -> list[str]:
+    return [
+        f"Ensemble Mean-Median - Min: {ensemble_statistics.mm_ensemble_min} "
+        f"Median: {ensemble_statistics.mm_ensemble_median} "
+        f"Percentile: {ensemble_statistics.mm_ensemble_median_percentile} Max: {ensemble_statistics.mm_ensemble_max}",
+        f"Ensemble Partisan Bias - Min: {ensemble_statistics.pb_ensemble_min} "
+        f"Median: {ensemble_statistics.pb_ensemble_median} "
+        f"Percentile: {ensemble_statistics.pb_ensemble_median_percentile} Max: {ensemble_statistics.pb_ensemble_max}"]
+
+
+def build_row(number_ensemble_plans: int, plan_statistics: Dict) -> str:
+    def format_float(x: float) -> str:
+        return format(x, '.2f').rstrip('0').rstrip('.')
+
+    def build_number_plans_str(bias: str, less_gerrymandered_than: int, number_ensemble_plans: int) -> str:
+        if bias == 'N':
+            return "N/A"
+        else:
+            return f"{less_gerrymandered_than:,d} out of {number_ensemble_plans:,d}"
+
+    row_text = """
+<tr class="telerik-reTableFooterRow-2">
+    <td class="telerik-reTableHeaderFirstCol-2" style="border:1px solid #4f81bd;   font-family: arial; font-size: 14pt;">{0}<br></td>
+    <td class="telerik-reTableHeaderFirstCol-2" style="border:1px solid #4f81bd;   font-family: arial; font-size: 14pt;"></td>
+    <td class="telerik-reTableHeaderFirstCol-2" style="border:1px solid #4f81bd;   font-family: arial; font-size: 14pt;">{1}<br></td>
+    <td class="telerik-reTableHeaderFirstCol-2" style="border:1px solid #4f81bd;   font-family: arial; font-size: 14pt;">{2}%<br></td>
+    <td class="telerik-reTableHeaderFirstCol-2" style="border:1px solid #4f81bd;   font-family: arial; font-size: 14pt;">{3}<br></td>
+    <td class="telerik-reTableHeaderFirstCol-2" style="border:1px solid #4f81bd;   font-family: arial; font-size: 14pt;">{4}%<br></td>
+    <td class="telerik-reTableHeaderFirstCol-2" style="border:1px solid #4f81bd;   font-family: arial; font-size: 14pt;">{5}</td>
+    <td class="telerik-reTableHeaderFirstCol-2" style="border:1px solid #4f81bd;   font-family: arial; font-size: 14pt;">{6}</td>
+</tr>
+"""
+
+    number_plans_str = build_number_plans_str(plan_statistics.bias, plan_statistics.less_gerrymandered_than,
+                                              number_ensemble_plans)
+
+    return row_text.format(plan_statistics.plan_name, format_float(plan_statistics.mm_plan),
+                           format_float(100 * (1 - plan_statistics.mm_portion)), plan_statistics.pb_plan,
+                           format_float(plan_statistics.pb_percentile), plan_statistics.bias, number_plans_str)
+
+
+def save_statistics_rows(chamber: str, directory: str, ensemble_statistics: (np.ndarray, np.ndarray),
+                         file_prefix: str, plans: Iterable[int]) -> None:
+    ensemble_mean_median, ensemble_partisan_bias = ensemble_statistics[chamber]
+    plan_vectors = cm.load_plan_vectors(chamber, directory, file_prefix, plans)
+
+    ensemble_statistics, plan_statistics_list = calculate_statistics(chamber, ensemble_mean_median,
+                                                                     ensemble_partisan_bias, plans, plan_vectors)
+    ensemble_statements = build_ensemble_statistics_statements(ensemble_statistics)
+    print("\n".join(ensemble_statements))
+
+    rows = []
+    for plan_statistics in plan_statistics_list:
+        rows.append(build_row(ensemble_statistics.number_ensemble_plans, plan_statistics))
+
+    cm.save_all_text("\n".join(rows), f'{directory}statistics_rows_{chamber}.txt')
 
 
 if __name__ == '__main__':
     def main():
-        chamber = "TXSN" # "USCD"  #
-
-        root_directory = 'C:/Users/rob/projects/election/rob/'
-
-        if False:
-            election = "PRES20"  # "SEN20" #
-            file_prefix = dt.build_election_filename_prefix(election)
-
-            print("Loading ensemble statistics")
-            mean_median, partisan_bias = load_ensemble_statistics(chamber, root_directory, file_prefix)
-
-            plans = determine_plans(chamber, root_directory)
-
-            plan_vectors = cm.load_plan_vectors(chamber, root_directory, file_prefix, plans)
-
-            statements = determine_statements(chamber, mean_median, partisan_bias, plans, plan_vectors)
-            for x in statements:
-                print(x)
+        directory = 'C:/Users/rob/projects/election/rob/'
 
         if True:
             file_prefix = dt.build_election_filename_prefix('PRES20')
             admissible_chambers = cm.CHAMBERS  # ['TXHD']
-            ensemble_statistics = {chamber: load_ensemble_statistics(chamber, root_directory, file_prefix) for
+            ensemble_statistics = {chamber: load_ensemble_statistics(chamber, directory, file_prefix) for
                                    chamber in admissible_chambers}
 
             for chamber in admissible_chambers:
-                plans_metadata_df = pp.load_plans_metadata(chamber, pp.build_plans_directory(root_directory))
-                valid_proposed_plans = pp.determine_valid_plans(plans_metadata_df)
-                save_statistics(chamber, root_directory, ensemble_statistics, file_prefix, valid_proposed_plans)
+                plans_metadata_df = pp.load_plans_metadata(chamber, pp.build_plans_directory(directory))
+                valid_proposed_plans = sorted(list(pp.determine_valid_plans(plans_metadata_df)))
+                print(f"Chamber: {chamber} {len([x for x in valid_proposed_plans if x >= 2101])}")
+
+                # save_statistics_statements(chamber, directory, ensemble_statistics, file_prefix,
+                #                           valid_proposed_plans)
+
+                valid_proposed_plans.reverse()
+                save_statistics_rows(chamber, directory, ensemble_statistics, file_prefix,
+                                     valid_proposed_plans)
 
 
     main()

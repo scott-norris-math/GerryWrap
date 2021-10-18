@@ -474,14 +474,14 @@ if __name__ == '__main__':
     def main():
         directory = 'C:/Users/rob/projects/election/rob/'
 
-        chamber = 'TXHD'  # 'TXSN'  # 'USCD'  #
+        chamber = 'TXSN'  # 'USCD'  # 'TXHD'  #
         seed_description, ensemble_number = cm.get_current_ensemble(chamber)
 
         if True:
             current_plan = 2100
             #comparison_plans = sorted(
             #    list(pp.get_valid_plans(chamber, pp.build_plans_directory(directory)) - {2100}), reverse=True)
-            comparison_plans = [2315]
+            comparison_plans = [2168]
 
             save_plots(chamber, directory, seed_description, ensemble_number, current_plan, comparison_plans)
 

@@ -648,7 +648,7 @@ def display_population_deviations(initial_partition: Partition) -> None:
     print((numpy.min([x for x in populations.values()]) - ideal_population) / ideal_population)
 
 
-def calculate_ideal_population(partition: Partition) -> None:
+def calculate_ideal_population(partition: Partition) -> float:
     return sum(partition["population"].values()) / len(partition)
 
 
