@@ -78,12 +78,13 @@ def determine_statements_v1(chamber: str, mm_ensemble: np.ndarray, pb_ensemble: 
         #   lives WRT two metrics
         # If overall plan favors R, we check in that direction
         # If overall plan favors D, we check in that direction
+        less_gerrymandered_than = -1
         if ckPlg == 1:
             less_gerrymandered_than = np.count_nonzero(np.logical_and(mm_ensemble >= mm_plan, pb_ensemble <= pb_plan))
         elif ckPlg == -1:
             less_gerrymandered_than = np.count_nonzero(np.logical_and(mm_ensemble <= mm_plan, pb_ensemble >= pb_plan))
 
-        if ckPlg != 0:
+        if ckPlg == 0:
             statements.append(plan_name + " is LESS gerrymandered than "
                               + str(less_gerrymandered_than) + " out of "
                               + str(number_ensemble_plans) + " plans")
@@ -139,7 +140,7 @@ def determine_plans(chamber: str, directory: str) -> list[int]:
 
 
 def save_statistics_statements(chamber: str, directory: str, ensemble_statistics: (np.ndarray, np.ndarray),
-                               file_prefix: str, plans) -> None:
+                               file_prefix: str, plans: Iterable[int]) -> None:
     plans = sorted(list(plans))
     ensemble_mean_median, ensemble_partisan_bias = ensemble_statistics[chamber]
     plan_vectors = cm.load_plan_vectors(chamber, directory, file_prefix, plans)
@@ -163,14 +164,17 @@ def calculate_statistics(chamber: str, mm_ensemble: np.ndarray, pb_ensemble: np.
     ensemble_statistics.pb_ensemble_median = pb_ensemble_median
     ensemble_statistics.pb_ensemble_max = max(pb_ensemble)
 
-    ensemble_statistics.mm_ensemble_median_percentile = stats.percentileofscore(mm_ensemble, mm_ensemble_median, kind='mean')
-    ensemble_statistics.pb_ensemble_median_percentile = stats.percentileofscore(pb_ensemble, pb_ensemble_median, kind='mean')
+    ensemble_statistics.mm_ensemble_median_percentile = stats.percentileofscore(mm_ensemble, mm_ensemble_median,
+                                                                                kind='mean')
+    ensemble_statistics.pb_ensemble_median_percentile = stats.percentileofscore(pb_ensemble, pb_ensemble_median,
+                                                                                kind='mean')
 
     number_ensemble_plans = len(mm_ensemble)
     ensemble_statistics.number_ensemble_plans = number_ensemble_plans
     plan_statistics_list = []
     for plan in plans:
         plan_statistics = Dict()
+        plan_statistics.plan = plan
         plan_statistics.plan_name = f'{cm.encode_chamber_character(chamber)}{plan}'
 
         plan_vector = plan_vectors[plan]
@@ -269,7 +273,24 @@ def build_ensemble_statistics_statements(ensemble_statistics: Dict) -> list[str]
         f"Percentile: {ensemble_statistics.pb_ensemble_median_percentile} Max: {ensemble_statistics.pb_ensemble_max}"]
 
 
-def build_row(number_ensemble_plans: int, plan_statistics: Dict) -> str:
+def build_plan_name_cell_html(chamber: str, plan: int) -> str:
+    media_anchor_map = {
+        ('TXSN', 2101): '31A47221BAD242F283515D8F9A5581AD',
+        ('TXSN', 2129): '3D5BF9F9329A45339B662200A7C44B9F',
+        ('USCD', 2101): '03ACC422B3B4483BB99AF151159D72BC',
+        ('USCD', 2102): '03ACC422B3B4483BB99AF151159D72BC',
+        ('USCD', 2103): '03ACC422B3B4483BB99AF151159D72BC',
+        ('USCD', 2104): '03ACC422B3B4483BB99AF151159D72BC',
+        ('USCD', 2105): '03ACC422B3B4483BB99AF151159D72BC',
+        ('USCD', 2135): 'B734C5E60A8C4202B83B007B15325E23'
+    }
+
+    plan_name = cm.build_plan_name(chamber, plan)
+    media_anchor_id = media_anchor_map.get((chamber, plan))
+    return plan_name if media_anchor_id is None else f'<a href="-/media/{media_anchor_id}.ashx">{plan_name}</a>'
+
+
+def build_row(chamber: str, number_ensemble_plans: int, plan_statistics: Dict) -> str:
     def format_float(x: float) -> str:
         return format(x, '.2f').rstrip('0').rstrip('.')
 
@@ -295,9 +316,10 @@ def build_row(number_ensemble_plans: int, plan_statistics: Dict) -> str:
     number_plans_str = build_number_plans_str(plan_statistics.bias, plan_statistics.less_gerrymandered_than,
                                               number_ensemble_plans)
 
-    return row_text.format(plan_statistics.plan_name, format_float(plan_statistics.mm_plan),
-                           format_float(100 * (1 - plan_statistics.mm_portion)), plan_statistics.pb_plan,
-                           format_float(plan_statistics.pb_percentile), plan_statistics.bias, number_plans_str)
+    return row_text.format(build_plan_name_cell_html(chamber, plan_statistics.plan),
+                           format_float(plan_statistics.mm_plan), format_float(100 * (1 - plan_statistics.mm_portion)),
+                           plan_statistics.pb_plan, format_float(plan_statistics.pb_percentile), plan_statistics.bias,
+                           number_plans_str)
 
 
 def save_statistics_rows(chamber: str, directory: str, ensemble_statistics: (np.ndarray, np.ndarray),
@@ -312,7 +334,7 @@ def save_statistics_rows(chamber: str, directory: str, ensemble_statistics: (np.
 
     rows = []
     for plan_statistics in plan_statistics_list:
-        rows.append(build_row(ensemble_statistics.number_ensemble_plans, plan_statistics))
+        rows.append(build_row(chamber, ensemble_statistics.number_ensemble_plans, plan_statistics))
 
     cm.save_all_text("\n".join(rows), f'{directory}statistics_rows_{chamber}.txt')
 

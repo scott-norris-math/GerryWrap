@@ -11,11 +11,10 @@ from scipy import stats
 import random
 import matplotlib.pyplot as plt
 
-import simulation as si
 import common as cm
+import simulation as si
 import proposed_plans as pp
 import data_transform as dt
-import utilities as ut
 from timer import Timer
 
 
@@ -66,20 +65,27 @@ def build_region_indices_path(ensemble_directory: str) -> str:
 
 def calculate_defects(dual_graph: nx.Graph, whole_targets: dict[str, int], intersect_targets: dict[str, int],
                       plans: np.ndarray):
-    counties = None
+    counties = si.extract_counties(county_district_graph)
+
     defects = []
     for i, plan in enumerate(plans):
         if i % 1000 == 0:
             print(i)
 
-        assignment = cm.build_assignment(dual_graph, plan)
-        county_district_graph = si.build_county_district_graph(dual_graph, assignment, whole_targets, intersect_targets)
+        plan_defects = calculate_plan_defects(dual_graph, counties, whole_targets, intersect_targets, plan)
 
-        if counties is None:
-            counties = si.extract_counties(county_district_graph)
-
-        defects.append(si.calculate_defect(county_district_graph, counties))
+        defects.append(plan_defects)
     return defects
+
+
+def calculate_plan_defects(dual_graph: nx.Graph, counties: set[str], whole_targets: dict[str, int], intersect_targets: dict[str, int], plan):
+    assignment = cm.build_assignment(dual_graph, plan)
+    county_district_graph = si.build_county_district_graph(dual_graph, assignment, whole_targets, intersect_targets)
+
+    if counties is None:
+        counties = si.extract_counties(county_district_graph)
+
+    return si.calculate_defect(county_district_graph, counties)
 
 
 def calculate_plans_defects(networkX_graph: nx.Graph, county_district_graph: nx.Graph, plans: np.ndarray) -> list[int]:
@@ -110,6 +116,7 @@ def save_unique_region_plans(directory: str, ensemble_description: str) -> None:
     cm.save_pickle(build_region_indices_path(ensemble_directory), region_indices_lookup)
 
     plans = cm.load_plans_from_file(directory, ensemble_description, 'unique_plans.npz')
+
     print(f'{len(plans)} {max(plans[0])}')
     for region, region_indices in region_indices_lookup.items():
         region_plans = plans[:, region_indices]
@@ -157,7 +164,7 @@ def save_region_product_ensemble() -> None:
 
         if verify:
             plan = plans[current_plan]
-            print(f"Defect: {calculate_defects(networkX_graph, whole_targets, intersect_targets, [plan])}")
+            print(f"Defect: {calculate_plan_defect(networkX_graph, whole_targets, intersect_targets, plan)}")
             print(len(set(plan)))
             if np.any(plan == 0) or len(set(plan)) != number_districts:
                 raise RuntimeError('')
@@ -182,7 +189,7 @@ if __name__ == '__main__':
 
         product_ensemble_description = 'TXHD_2176_product_1'
         product_ensemble_directory = cm.build_ensemble_directory(directory, product_ensemble_description)
-        ut.ensure_directory_exists(product_ensemble_directory)
+        cm.ensure_directory_exists(product_ensemble_directory)
 
         if False:
             county_defects = si.calculate_county_defects(county_district_graph, counties)

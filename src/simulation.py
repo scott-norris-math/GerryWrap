@@ -19,7 +19,6 @@ from addict import Dict
 import math
 
 import common as cm
-import utilities as ut
 import data_transform as dt
 import proposed_plans as pp
 
@@ -237,7 +236,7 @@ def run_chain_impl(chain: MarkovChain, elections: Iterable[Election], output_dir
     def build_maps_directory(directory):
         return f'{directory}maps/'
 
-    ut.ensure_directory_exists(output_directory)
+    cm.ensure_directory_exists(output_directory)
 
     node_id_to_index = build_node_id_to_index(chain.initial_state)
     save_columns_map(output_directory, node_id_to_index)
@@ -250,7 +249,7 @@ def run_chain_impl(chain: MarkovChain, elections: Iterable[Election], output_dir
     plans_output_size = 100000
     step_number = 0
     maps_directory = build_maps_directory(output_directory)
-    ut.ensure_directory_exists(maps_directory)
+    cm.ensure_directory_exists(maps_directory)
     for partition in chain:
         if step_number % 10000 == 0:
             partition.plot()
@@ -538,7 +537,7 @@ def build_accept_function(state: dict[str, Any]) -> Callable:
     return lambda x: better_defect_accept(x, state)
 
 
-def better_defect_accept(partition: Partition, state: dict[str, Any]):
+def better_defect_accept(partition: Partition, state: dict[str, Any]) -> bool:
     """Measure defect. If defect is better, accept.
     If defect is worse, random prob of acceptance"""
     # This is the bipartite graph that encodes the "parent"
@@ -548,7 +547,7 @@ def better_defect_accept(partition: Partition, state: dict[str, Any]):
     state['step_number'] = step_number + 1
 
     if partition.parent is None:
-        return 1
+        return True
 
     county_district_graph = build_county_district_graph(state['dual_graph'], partition.assignment,
                                                         state['whole_targets'], state['intersect_targets'])

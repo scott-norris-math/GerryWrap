@@ -8,7 +8,6 @@ import numpy as np
 
 import common as cm
 from timer import Timer
-import utilities as ut
 
 
 def get_census_chamber_name(chamber: str) -> str:
@@ -46,7 +45,7 @@ def determine_data_columns(df: pd.DataFrame) -> list[str]:
         'USSen_2020_general_D_Hegar',
         'USSen_2020_general_R_Cornyn'
     ]
-    return ut.union(race_columns, election_columns)
+    return cm.union(race_columns, election_columns)
 
 
 def o17_pop(df: pd.DataFrame) -> pd.Series:
@@ -171,8 +170,7 @@ def load_filtered_redistricting_data(directory: str, redistricting_data_filename
 
 def combine_and_fix_redistricting_data_file(directory: str) -> None:
     county_data = pd.read_csv(f'{pp.build_redistricting_data_directory(directory)}nodes_TX_2020_cnty_sldu.csv')
-    county_vtd_data = pd.read_csv(
-        f'{pp.build_redistricting_data_directory(directory)}nodes_TX_2020_cntyvtd_sldu.csv')
+    county_vtd_data = pd.read_csv(f'{pp.build_redistricting_data_directory(directory)}nodes_TX_2020_cntyvtd_sldu.csv')
 
     county_data['geoid'] = county_data['geoid'].astype('str').apply(lambda p: p.zfill(3))
     county_vtd_data['geoid'] = county_vtd_data['geoid'].astype('str').apply(lambda p: p.zfill(9))
@@ -275,7 +273,7 @@ if __name__ == '__main__':
 
         if False:
             ensemble_description = 'TXHD_2176_Reduced_3'
-            plans = cm.load_plans_from_files(directory, ensemble_description, 12)
+            plans = cm.load_plans_from_files(directory, ensemble_description, [12])
             ensemble_directory = cm.build_ensemble_directory(directory, ensemble_description)
             save_unique_plans(ensemble_directory, plans)
 
@@ -301,7 +299,7 @@ if __name__ == '__main__':
                                 ['Outputs_USCD_2020Census/', 'Outputs_USCD_2020Census_A/']]
 
             merged_data_directory = root_directory + chamber + '/'
-            ensure_directory_exists(merged_data_directory)
+            cm.ensure_directory_exists(merged_data_directory)
 
             merge_data(data_directories, merged_data_directory)
 
@@ -309,7 +307,7 @@ if __name__ == '__main__':
             # save_numpy_arrays(chamber, df, merged_data_directory)
 
         if False:
-            assignments = [('c', 1), ('b', 1), ('a', 3), ('q', 4), ('aa', 1)]
+            assignments = [(3, 1), (2, 1), (1, 3), (17, 4), (27, 1)]
             canonical_list = build_canonical_assignments_list(assignments)
             print(canonical_list)
 

@@ -1,3 +1,4 @@
+import os
 import csv
 import zipfile
 from collections import defaultdict
@@ -6,6 +7,7 @@ from typing import Iterable, Callable, Any
 import numpy as np
 import gerrychain
 import pickle
+
 from addict import Dict
 
 
@@ -66,9 +68,9 @@ def load_ensemble_matrix_sorted_transposed_from_path(path: str) -> np.ndarray:
     for row in ensemble_matrix:
         row.sort()
     ensemble_matrix = ensemble_matrix.transpose()
-    districts, chainlength = np.shape(ensemble_matrix)
+    districts, number_plans = np.shape(ensemble_matrix)
     print(districts, "districts")
-    print(chainlength, "plans")
+    print(number_plans, "plans")
     return ensemble_matrix
 
 
@@ -76,11 +78,15 @@ def load_numpy_compressed(path: str) -> np.ndarray:
     return np.load(path)['arr_0']
 
 
-def load_plan_vectors(chamber: str, input_directory: str, statistic_name: str, plans: Iterable[int]) -> dict[
-    int, np.ndarray]:
+def build_plan_name(chamber: str, plan: int) -> str:
+    return f"{encode_chamber_character(chamber)}{plan}"
+
+
+def load_plan_vectors(chamber: str, input_directory: str, statistic_name: str, plans: Iterable[int]) -> \
+        dict[int, np.ndarray]:
     plan_vectors = {}
     for plan in plans:
-        plan_vector_directory = f'{input_directory}plan_vectors/vectors_PLAN{encode_chamber_character(chamber)}{plan}/'
+        plan_vector_directory = f'{input_directory}plan_vectors/vectors_PLAN{build_plan_name(chamber, plan)}/'
 
         path = f'{plan_vector_directory}{statistic_name}_vector.csv'
         plan_vectors[plan] = load_numpy_csv(path)
@@ -156,7 +162,7 @@ def calculate_plan_hash(plan: np.ndarray) -> int:
     return hash(build_canonical_plan_set(plan))
 
 
-def build_plan_set_list(plan: np.ndarray) -> np.ndarray: # list[frozenset[int]]:
+def build_plan_set_list(plan: np.ndarray) -> np.ndarray:
     district_plans_lookup = defaultdict(set[int])
     for i, district in enumerate(plan):
         district_plans_lookup[district].add(i)
@@ -201,25 +207,25 @@ def determine_unique_plans(plans: np.ndarray) -> np.ndarray:
     return np.array(unique_plans)
 
 
-def adjoin(l: list, f: Callable) -> list:
-    return [(x, f(x)) for x in l]
+def adjoin(elements: list, f: Callable) -> list:
+    return [(x, f(x)) for x in elements]
 
 
-def count_groups(l: list) -> dict:
+def count_groups(elements: list) -> dict:
     counts = defaultdict(int)
-    for x in l:
+    for x in elements:
         counts[x] += 1
     return counts
 
 
 def groupby_project(iterable, key: Callable, projection: Callable) -> list:
-    sorted = iterable.copy()
-    sorted.sort(key=key)
-    return [(x, [projection(z) for z in y]) for x, y in groupby(sorted, key)]
+    sorted_elements = iterable.copy()
+    sorted_elements.sort(key=key)
+    return [(x, [projection(z) for z in y]) for x, y in groupby(sorted_elements, key)]
 
 
-def to_dict(l: list) -> dict:
-    return {x: y for x, y in l}
+def to_dict(elements: list) -> dict:
+    return {x: y for x, y in elements}
 
 
 def join_dict(d1: dict, d2: dict) -> dict:
@@ -234,9 +240,9 @@ def save_pickle(path: str, obj: Any) -> None:
 
 def load_pickle(path: str) -> Any:
     infile = open(path, 'rb')
-    object = pickle.load(infile)
+    obj = pickle.load(infile)
     infile.close()
-    return object
+    return obj
 
 
 def get_current_ensemble(chamber: str) -> tuple[str, int]:
@@ -253,6 +259,14 @@ def get_current_ensemble(chamber: str) -> tuple[str, int]:
         raise RuntimeError("Unknown chamber")
 
     return seed_description, ensemble_number
+
+
+def determine_original_plan(chamber: str) -> int:
+    return {
+        'USCD': None,
+        'TXHD': 2100,
+        'TXSN': 2100
+    }[chamber]
 
 
 def determine_population_limit(chamber: str) -> float:
@@ -279,6 +293,9 @@ def build_TXSN_random_seed_simulation_settings() -> Dict:
     return settings
 
 
+def ensure_directory_exists(output_directory: str) -> None:
+    os.makedirs(output_directory, exist_ok=True)
 
 
-
+def union(x: list, y: list) -> list:
+    return list(set(x) | set(y))

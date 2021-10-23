@@ -8,10 +8,10 @@ import matplotlib.pyplot as plt
 import pylab
 from operator import itemgetter
 
-import data_transform as dt
-import utilities as ut
-from timer import Timer
 import common as cm
+import data_transform as dt
+from timer import Timer
+
 
 SCTB_COLUMN_NAME = 'SCTBKEY'
 
@@ -28,14 +28,14 @@ def determine_data_tablock_columns(df: pd.DataFrame) -> list[str]:
         'USSen_2020_D_Hegar_general',
         'USSen_2020_R_Cornyn_general'
     ]
-    return ut.union(race_columns, election_columns)
+    return cm.union(race_columns, election_columns)
 
 
 def save_data_tablock_columns(chamber: str, directory: str, data_path: str) -> None:
     data_df = pd.read_parquet(data_path)
     print("Data: " + str(len(data_df)))
-    data_columns = ['geoid', 'county', dt.get_census_chamber_name(chamber), 'total_pop'] + \
-                   determine_data_tablock_columns(data_df)
+    data_columns = ['geoid', 'county', dt.get_census_chamber_name(chamber),
+                    'total_pop'] + determine_data_tablock_columns(data_df)
 
     print("Data Columns: " + str(len(data_columns)))
     print(data_columns)
@@ -250,7 +250,7 @@ def save_vector_file(chamber: str, df: pd.DataFrame, path: str,
 def save_plan_vectors(chamber: str, directory: str, plan: int) -> None:
     plan_df = pd.read_parquet(build_plan_data_path(chamber, directory, plan, 'parquet'))
     output_directory = build_plan_vectors_directory(chamber, directory, plan)
-    ut.ensure_directory_exists(output_directory)
+    cm.ensure_directory_exists(output_directory)
     vector_settings = build_statistics_vector_settings()
 
     for filename, statistic_func in vector_settings:
@@ -276,7 +276,7 @@ def get_known_plans(chamber: str, plans_raw_directory: str) -> set[int]:
 
 def save_current_merged_plans(chamber: str, directory: str, plans_metadata: pd.DataFrame, force=False) -> None:
     plans_directory = build_plans_directory(directory)
-    ut.ensure_directory_exists(plans_directory)
+    cm.ensure_directory_exists(plans_directory)
 
     for plan_metadata in plans_metadata.itertuples():
         plan = plan_metadata.plan
@@ -297,7 +297,7 @@ def save_current_merged_plans(chamber: str, directory: str, plans_metadata: pd.D
 
 
 def save_current_plan_vectors(chamber: str, directory: str) -> None:
-    ut.ensure_directory_exists(directory + 'plan_vectors/')
+    cm.ensure_directory_exists(directory + 'plan_vectors/')
     plans_directory = build_plans_directory(directory)
     plans_metadata = load_plans_metadata(chamber, plans_directory)
 
@@ -511,7 +511,7 @@ def analyze_bef_assignments(chamber: str, directory: str, plan: int) -> None:
     if not len(bef_assignments_df) == len(bef_df):
         raise RuntimeError("Invalid Length")
 
-    bef_assignments_df.to_csv(directory + 'bef_assignments_' + plan + '.csv')
+    bef_assignments_df.to_csv(f'{directory}bef_assignments_{plan}.csv')
     print(len(bef_df))
     print(len(assignments_df))
     print(bef_assignments_df.columns)
@@ -598,8 +598,8 @@ def extract_graph_block_assignments(graph: nx.Graph) -> list[tuple[str, int, str
 def save_graph_filtered(chamber: str, directory: str, proposed_plans_metadata: pd.DataFrame) -> None:
     def filter_plans(proposed_plans_metadata, min_plan):
         return proposed_plans_metadata[(proposed_plans_metadata['plan'] >= min_plan) & (
-                (proposed_plans_metadata['previous_plan'] >= min_plan) | (
-                proposed_plans_metadata['previous_plan'] == 0))]
+                (proposed_plans_metadata['previous_plan'] >= min_plan) |
+                (proposed_plans_metadata['previous_plan'] == 0))]
 
     proposed_plans_metadata = proposed_plans_metadata[proposed_plans_metadata['plan'] != 2100]
     if chamber == 'TXHD':
