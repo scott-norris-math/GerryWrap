@@ -31,7 +31,7 @@ def save_report(chamber: str, directory: str, j2_template: jinja2.Template, plan
         'chamber': chamber,
         'plan': plan,
         'plan_name': cm.build_plan_name(chamber, plan),
-        'original_plan': str(determine_original_plan(chamber)),
+        'original_plan': str(cm.determine_original_plan(chamber)),
         'number_plans': determine_number_plans(chamber),
         'plots_directory': pl.build_plots_directory(directory, ensemble_description)
     }

@@ -3,7 +3,7 @@ import csv
 import zipfile
 from collections import defaultdict
 from itertools import groupby
-from typing import Iterable, Callable, Any
+from typing import Iterable, Callable, Any, Optional
 import numpy as np
 import gerrychain
 import pickle
@@ -41,14 +41,17 @@ def build_assignment(graph: gerrychain.Graph, plan: np.ndarray) -> dict[str, int
 def save_all_text(text: str, path: str) -> None:
     with open(path, 'w', encoding='utf8') as fp:
         fp.write(text)
-    fp.close()
 
 
 def read_all_text(path: str) -> str:
-    file = open(path, mode='r')
-    page_text = file.read()
-    file.close()
+    with open(path, mode='r') as fp:
+        page_text = fp.read()
     return page_text
+
+
+def save_all_bytes(data, path: str) -> None:
+    with open(path, 'wb') as fp:
+        fp.write(data)
 
 
 def unzip_file(output_directory: str, zip_path: str) -> None:
@@ -131,7 +134,7 @@ def load_numpy_csv(path: str) -> np.ndarray:
 
 
 def load_merged_numpy_csv(filename: str, directories: list[str]) -> np.ndarray:
-    data = [cm.load_numpy_csv(x + filename) for x in directories]
+    data = [load_numpy_csv(x + filename) for x in directories]
     return np.concatenate(data)
 
 
@@ -152,7 +155,7 @@ def get_allowed_number_districts(chamber: str) -> list[int]:
 
 
 def build_canonical_plan_set(plan: np.ndarray) -> frozenset[frozenset[int]]:
-    district_plans_lookup = defaultdict(set[int])
+    district_plans_lookup: dict[int, set[int]] = defaultdict(set[int])
     for i, district in enumerate(plan):
         district_plans_lookup[district].add(i)
     return frozenset(frozenset(x) for x in district_plans_lookup.values())
@@ -163,7 +166,7 @@ def calculate_plan_hash(plan: np.ndarray) -> int:
 
 
 def build_plan_set_list(plan: np.ndarray) -> np.ndarray:
-    district_plans_lookup = defaultdict(set[int])
+    district_plans_lookup: dict[int, set[int]] = defaultdict(set[int])
     for i, district in enumerate(plan):
         district_plans_lookup[district].add(i)
     return np.array(frozenset(district_plans_lookup[x]) for x in sorted(district_plans_lookup))
@@ -193,7 +196,7 @@ def diff_plan_set_list(plan1: list[frozenset[int]], plan2: list[frozenset[int]],
 
 
 def determine_unique_plans(plans: np.ndarray) -> np.ndarray:
-    unique_plans = []
+    unique_plans: list[np.ndarray] = []
     plan_hashes = set()
     for i, plan in enumerate(plans):
         if i % 1000 == 0:
@@ -212,16 +215,16 @@ def adjoin(elements: list, f: Callable) -> list:
 
 
 def count_groups(elements: list) -> dict:
-    counts = defaultdict(int)
+    counts: dict[Any, int] = defaultdict(int)
     for x in elements:
         counts[x] += 1
     return counts
 
 
-def groupby_project(iterable, key: Callable, projection: Callable) -> list:
-    sorted_elements = iterable.copy()
-    sorted_elements.sort(key=key)
-    return [(x, [projection(z) for z in y]) for x, y in groupby(sorted_elements, key)]
+def groupby_project(elements: list, key: Callable, projection: Callable) -> list:
+    elements_copy = elements.copy()
+    elements_copy.sort(key=key)
+    return [(x, [projection(z) for z in y]) for x, y in groupby(elements_copy, key)]
 
 
 def to_dict(elements: list) -> dict:
@@ -261,7 +264,7 @@ def get_current_ensemble(chamber: str) -> tuple[str, int]:
     return seed_description, ensemble_number
 
 
-def determine_original_plan(chamber: str) -> int:
+def determine_original_plan(chamber: str) -> Optional[int]:
     return {
         'USCD': None,
         'TXHD': 2100,

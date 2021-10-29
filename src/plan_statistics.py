@@ -30,7 +30,7 @@ def calculate_partisan_bias(plan_vector: np.ndarray) -> float:
 
 
 def determine_statements_v1(chamber: str, mm_ensemble: np.ndarray, pb_ensemble: np.ndarray, plans: list[int],
-                            plan_vectors: dict[int: np.ndarray]) -> list[str]:
+                            plan_vectors: dict[int, np.ndarray]) -> list[str]:
     mm_ensemble_median = np.median(mm_ensemble)
     pb_ensemble_median = np.median(pb_ensemble)
 
@@ -94,7 +94,7 @@ def determine_statements_v1(chamber: str, mm_ensemble: np.ndarray, pb_ensemble: 
     return statements
 
 
-def calculate_ensemble_matrix_statistics(ensemble_matrix: np.ndarray) -> (np.ndarray, np.ndarray):
+def calculate_ensemble_matrix_statistics(ensemble_matrix: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     _, number_ensemble_plans = np.shape(ensemble_matrix)
     mean_median = np.zeros(number_ensemble_plans)
     partisan_bias = np.zeros(number_ensemble_plans)
@@ -106,7 +106,7 @@ def calculate_ensemble_matrix_statistics(ensemble_matrix: np.ndarray) -> (np.nda
     return mean_median, partisan_bias
 
 
-def load_ensemble_statistics(chamber: str, root_directory: str, input_prefix: str) -> (np.ndarray, np.ndarray):
+def load_ensemble_statistics(chamber: str, root_directory: str, input_prefix: str) -> tuple[np.ndarray, np.ndarray]:
     path = f'{root_directory}ensemble_{chamber}_{input_prefix}_statistics.npz'
     if os.path.exists(path):
         archive = np.load(path)
@@ -139,7 +139,8 @@ def determine_plans(chamber: str, directory: str) -> list[int]:
     return plans
 
 
-def save_statistics_statements(chamber: str, directory: str, ensemble_statistics: (np.ndarray, np.ndarray),
+def save_statistics_statements(chamber: str, directory: str,
+                               ensemble_statistics: dict[str, tuple[np.ndarray, np.ndarray]],
                                file_prefix: str, plans: Iterable[int]) -> None:
     plans = sorted(list(plans))
     ensemble_mean_median, ensemble_partisan_bias = ensemble_statistics[chamber]
@@ -152,7 +153,7 @@ def save_statistics_statements(chamber: str, directory: str, ensemble_statistics
 
 
 def calculate_statistics(chamber: str, mm_ensemble: np.ndarray, pb_ensemble: np.ndarray, plans: Iterable[int],
-                         plan_vectors: dict[int: np.ndarray]) -> tuple[Dict, list[Dict]]:
+                         plan_vectors: dict[int, np.ndarray]) -> tuple[Dict, list[Dict]]:
     mm_ensemble_median = np.median(mm_ensemble)
     pb_ensemble_median = np.median(pb_ensemble)
 
@@ -322,19 +323,19 @@ def build_row(chamber: str, number_ensemble_plans: int, plan_statistics: Dict) -
                            number_plans_str)
 
 
-def save_statistics_rows(chamber: str, directory: str, ensemble_statistics: (np.ndarray, np.ndarray),
+def save_statistics_rows(chamber: str, directory: str, ensemble_statistics: dict[str, tuple[np.ndarray, np.ndarray]],
                          file_prefix: str, plans: Iterable[int]) -> None:
     ensemble_mean_median, ensemble_partisan_bias = ensemble_statistics[chamber]
     plan_vectors = cm.load_plan_vectors(chamber, directory, file_prefix, plans)
 
-    ensemble_statistics, plan_statistics_list = calculate_statistics(chamber, ensemble_mean_median,
-                                                                     ensemble_partisan_bias, plans, plan_vectors)
-    ensemble_statements = build_ensemble_statistics_statements(ensemble_statistics)
+    ensemble_calculation, plan_statistics_list = calculate_statistics(chamber, ensemble_mean_median,
+                                                                      ensemble_partisan_bias, plans, plan_vectors)
+    ensemble_statements = build_ensemble_statistics_statements(ensemble_calculation)
     print("\n".join(ensemble_statements))
 
     rows = []
     for plan_statistics in plan_statistics_list:
-        rows.append(build_row(chamber, ensemble_statistics.number_ensemble_plans, plan_statistics))
+        rows.append(build_row(chamber, ensemble_calculation.number_ensemble_plans, plan_statistics))
 
     cm.save_all_text("\n".join(rows), f'{directory}statistics_rows_{chamber}.txt')
 

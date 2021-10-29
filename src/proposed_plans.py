@@ -1,6 +1,6 @@
 import os
 import pandas as pd
-from typing import Callable
+from typing import Callable, Optional
 import glob
 from shutil import copy2
 import networkx as nx
@@ -103,8 +103,8 @@ def normalize_block_equivalency_df(bef_df: pd.DataFrame) -> None:
         bef_df.drop(columns=[SCTB_COLUMN_NAME], inplace=True)
 
 
-def merge_block_equivalence_files(chamber: str, directory: str, source_plan: int, diff_plan: int) -> (
-        pd.DataFrame, int):
+def merge_block_equivalence_files(chamber: str, directory: str, source_plan: int, diff_plan: int) -> tuple[
+    pd.DataFrame, int]:
     source_bef_df = load_block_equivalency_file(build_plan_path(chamber, directory, source_plan))
     diff_bef_df = load_block_equivalency_file(build_plan_raw_path(chamber, directory, diff_plan))
     source_bef_df.set_index([SCTB_COLUMN_NAME], inplace=True)
@@ -122,8 +122,7 @@ def merge_block_equivalence_files(chamber: str, directory: str, source_plan: int
     return joined_source_bef_df, number_changed_rows
 
 
-def compare_block_equivalence_files(chamber: str, directory: str, source_plan: int, target_plan: int) -> (
-        pd.DataFrame, int):
+def compare_block_equivalence_files(chamber: str, directory: str, source_plan: int, target_plan: int) -> int:
     source_bef_df = load_block_equivalency_file(build_plan_path(chamber, directory, source_plan))
     target_bef_df = load_block_equivalency_file(build_plan_path(chamber, directory, target_plan))
     source_bef_df.set_index([SCTB_COLUMN_NAME], inplace=True)
@@ -379,7 +378,7 @@ def build_graph_path(chamber: str, directory: str) -> str:
 
 
 def save_graph(chamber: str, directory: str, plans_metadata: pd.DataFrame) -> None:
-    def parse_submitter(submitter: str) -> (bool, str):
+    def parse_submitter(submitter: str) -> tuple[Optional[str], str]:
         elements = submitter.split(" ")
         cleaned_title = elements[0].removesuffix(".")
         if len(elements) == 2:
@@ -395,7 +394,8 @@ def save_graph(chamber: str, directory: str, plans_metadata: pd.DataFrame) -> No
         else:
             return None, submitter
 
-    def determine_node_color(submitter: (str, str), party_lookup: dict[str, dict[str, str]], is_max_plan: bool) -> str:
+    def determine_node_color(submitter: tuple[Optional[str], str], party_lookup: dict[str, dict[str, str]],
+                             is_max_plan: bool) -> str:
         title = submitter[0]
         last_name = submitter[1]
         party = None
@@ -522,7 +522,7 @@ def analyze_proposed_plan_seed_assignments(chamber: str, root_directory: str, pl
     networkXGraph = nx.read_gpickle(f'{root_directory}seeds/graph_TX_2020_cntyvtd_{chamber}_{plan}.gpickle')
     nodes = networkXGraph.nodes
 
-    node_districts = [(x, y['district'], count_groups(y['node_districts'].split(','))) for x, y in nodes.items()]
+    node_districts = [(x, y['district'], cm.count_groups(y['node_districts'].split(','))) for x, y in nodes.items()]
     print(node_districts)
 
     nodes_with_multiple_districts = [(x, y, z) for x, y, z in node_districts if len(z) > 1]
@@ -551,7 +551,7 @@ def analyze_proposed_plan_seed_assignments_v2(chamber: str, directory: str, plan
     average_population = sum(correct_district_populations.values()) / len(correct_district_populations)
     print(f"Avg Population: {average_population}")
     node_populations = [(node['district'], node['total_pop']) for node in graph.nodes.values()]
-    node_populations_groups = groupby_project(node_populations, itemgetter(0), itemgetter(1))
+    node_populations_groups = cm.groupby_project(node_populations, itemgetter(0), itemgetter(1))
     graph_district_populations = {x: sum(y) for x, y in node_populations_groups}
 
     # print(graph_district_populations)
@@ -560,7 +560,7 @@ def analyze_proposed_plan_seed_assignments_v2(chamber: str, directory: str, plan
     # graph_district_populations = [district, sum() for district, nodes in node_populations.group]
     # print(list(district_blocks))
     # print(correct_district_populations)
-    both_populations = join_dict(graph_district_populations, correct_district_populations)
+    both_populations = cm.join_dict(graph_district_populations, correct_district_populations)
     different_populations = [(x, y, z, y - z, (y - z) / average_population) for x, (y, z) in both_populations.items() if
                              y != z]
     print(sorted(different_populations, key=lambda x: x[4]))

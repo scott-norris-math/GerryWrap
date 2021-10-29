@@ -94,7 +94,7 @@ def load_graph_with_geometry(directory: str, dual_graph_filename: str, geodata: 
     networkXGraph = nx.read_gpickle(seeds_directory + dual_graph_filename)
 
     graph = Graph(networkXGraph, geometry=geodata)
-    graph.join(geodata, columns=["geometry"], right_index="geoid")
+    graph.join(geodata, columns=['geometry'], right_index='geoid')
 
     # TODO: this may be unnecessary - check
     filtered_df = geodata[geodata['geoid'].isin(graph.nodes().keys())]
@@ -162,7 +162,7 @@ def load_county_district_graph(directory: str, filename: str) -> nx.Graph:
     return graph
 
 
-def build_chain(chamber: str, directory: str, settings, number_steps: int) -> (MarkovChain, Iterable[Election]):
+def build_chain(chamber: str, directory: str, settings, number_steps: int) -> tuple[MarkovChain, Iterable[Election]]:
     geodata = load_geodataframe(directory, settings.redistricting_data_filename)
 
     graph = load_graph_with_geometry(directory, settings.networkX_graph_filename, geodata)
@@ -187,7 +187,7 @@ def build_chain(chamber: str, directory: str, settings, number_steps: int) -> (M
         whole_targets, intersect_targets = extract_defect_targets(county_district_graph)
         state = {
             'node_id_to_index': build_node_id_to_index(initial_partition),
-            'dual_graph': networkXGraph,
+            'dual_graph': graph,
             'whole_targets': whole_targets,
             'intersect_targets': intersect_targets
         }
@@ -270,7 +270,7 @@ def run_chain_impl(chain: MarkovChain, elections: Iterable[Election], output_dir
         if plan_index == 0:
             if step_number > 0:
                 file_index = (step_number // plans_output_size) - 1
-                np.savez_compressed(f"{newdir}/plans_{file_index}.npz", plans_array)
+                np.savez_compressed(f'{output_directory}/plans_{file_index}.npz', plans_array)
             number_nodes = len(partition.graph.nodes)
             plans_array = np.ndarray([plans_output_size, number_nodes], np.uint8)
 
@@ -419,11 +419,11 @@ class CountyDefect(NamedTuple):
     defect_intersected: int
 
 
-def determine_isolated_counties(graph: nx.Graph, counties: Iterable[str], minimum_whole_counties: int) -> list[str]:
+def determine_isolated_counties(graph: nx.Graph, counties: Iterable[str], minimum_whole_counties: int) -> set[str]:
     county_defects = calculate_county_defects(graph, counties)
-    return [x.county for x in county_defects if
+    return {x.county for x in county_defects if
             x.number_whole_districts >= minimum_whole_counties and
-            x.number_whole_districts == x.number_intersected_districts]
+            x.number_whole_districts == x.number_intersected_districts}
 
 
 def calculate_county_defects(graph: nx.Graph, counties: Iterable[str]) -> list[CountyDefect]:
@@ -472,7 +472,7 @@ def extract_counties(county_district_graph: nx.Graph) -> set[str]:
     return {node for node, data in county_district_graph.nodes(data=True) if data['bipartite'] == 0}
 
 
-def extract_defect_targets(graph: nx.Graph) -> (dict[str, int], dict[str, int]):
+def extract_defect_targets(graph: nx.Graph) -> tuple[dict[str, int], dict[str, int]]:
     counties = extract_counties(graph)
 
     whole_targets = {}
@@ -589,8 +589,8 @@ def better_defect_accept(partition: Partition, state: dict[str, Any]) -> bool:
         plan_hashes.add(plan_hash)
         if len([x for x, y in previous_parents if x == plan_hash]) == 0:
             previous_parents.append((plan_hash, partition))
-            if len(previous_parent) > 200:
-                previous_parent.pop(0)
+            if len(previous_parents) > 200:
+                previous_parents.pop(0)
         state['failures'] = 0
     else:
         if 'failures' not in state:
@@ -642,9 +642,9 @@ def display_population_deviations(initial_partition: Partition) -> None:
     print(len(initial_partition))
     print(ideal_population)
     populations = initial_partition["population"]
-    numpy.concatenate(populations.values())
-    print((numpy.max([x for x in populations.values()]) - ideal_population) / ideal_population)
-    print((numpy.min([x for x in populations.values()]) - ideal_population) / ideal_population)
+    np.concatenate(populations.values())
+    print((np.max([x for x in populations.values()]) - ideal_population) / ideal_population)
+    print((np.min([x for x in populations.values()]) - ideal_population) / ideal_population)
 
 
 def calculate_ideal_population(partition: Partition) -> float:

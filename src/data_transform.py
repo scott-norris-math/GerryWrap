@@ -5,8 +5,11 @@ import pandas as pd
 from typing import Callable, Iterable
 import networkx as nx
 import numpy as np
+from datetime import datetime
 
 import common as cm
+import proposed_plans as pp
+import simulation as si
 from timer import Timer
 
 
@@ -23,7 +26,7 @@ def merge_plan_data(input_directories: Iterable[str], output_directory: str) -> 
     data_files = [(x, y) for x in input_directories for y in listdir(x)
                   if isfile(x + y) and any(mask in y for mask in masks)]
 
-    file_groups = defaultdict(list)
+    file_groups: dict[str, list[str]] = defaultdict(list)
 
     print(data_files)
     print(file_groups)
@@ -33,7 +36,7 @@ def merge_plan_data(input_directories: Iterable[str], output_directory: str) -> 
 
     for filename, directories in file_groups.items():
         print('Merging:' + filename)
-        merged_array = load_merged_numpy_csv(filename, directories)
+        merged_array = cm.load_merged_numpy_csv(filename, directories)
         cm.save_numpy_csv(output_directory + filename, merged_array)
 
 

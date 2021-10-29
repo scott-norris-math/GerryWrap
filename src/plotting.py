@@ -10,7 +10,7 @@ import pandas as pd
 import geopandas as gpd
 import matplotlib as mpl
 from matplotlib.colors import ListedColormap
-from typing import Iterable, Any
+from typing import Iterable, Any, Optional
 
 import common as cm
 import plan_statistics as ps
@@ -166,7 +166,8 @@ def hist_ensemble_comps(chamber: str, ensemble_matrix_transposed: np.ndarray, pe
 
 
 def save_seats_voteshares_ensemble_comps_plot(chamber: str, output_directory: str, election: str,
-                                              ensemble_matrix: np.ndarray, current_plan: int, comparison_plan: int,
+                                              ensemble_matrix: np.ndarray, current_plan: Optional[int],
+                                              comparison_plan: int,
                                               plan_vectors: dict[int, np.ndarray], plan_pnums: list[bool],
                                               plan_legend_names: list[str], plan_colors: list[str]) -> None:
     plot_title = get_chamber_pretty_name(chamber) + ' District Results  (' + get_election_pretty_name(election) + ')'
@@ -181,7 +182,8 @@ def save_seats_voteshares_ensemble_comps_plot(chamber: str, output_directory: st
     plt.rcParams.update(plt.rcParamsDefault)
 
 
-def save_violin_comparison_plots(chamber: str, ensemble_matrix: np.ndarray, current_plan: int, comparison_plan: int,
+def save_violin_comparison_plots(chamber: str, ensemble_matrix: np.ndarray, current_plan: Optional[int],
+                                 comparison_plan: int,
                                  plan_pnums: list[bool], plan_legend_names: list[str], plan_colors: list[str],
                                  plan_vectors: dict[int, np.ndarray], plot_title: str, fill_color: Any,
                                  h_line_label: str, y_axis_label: str) -> Any:
@@ -260,7 +262,8 @@ def save_racial_plots(chamber: str, root_directory: str, ensemble_directory: str
 
 
 def save_racial_ensemble_comps_plot(chamber: str, output_directory: str, group: str, ensemble_matrix: np.ndarray,
-                                    current_plan: int, comparison_plan: int, plan_vectors: dict[int, np.ndarray],
+                                    current_plan: Optional[int], comparison_plan: int,
+                                    plan_vectors: dict[int, np.ndarray],
                                     plan_pnums: list[bool], plan_legend_names: list[str], plan_colors: list[str]) \
         -> None:
     plot_title = get_chamber_pretty_name(chamber) + ' District Results  (' + get_racial_group_pretty_name(group) + ')'
@@ -276,7 +279,7 @@ def save_racial_ensemble_comps_plot(chamber: str, output_directory: str, group: 
 
 
 def save_racial_histograms(chamber: str, output_directory: str, group: str, ensemble_matrix_transposed: np.ndarray,
-                           current_plan: int, comparison_plan: int, plan_vectors: dict[int, np.ndarray],
+                           current_plan: Optional[int], comparison_plan: int, plan_vectors: dict[int, np.ndarray],
                            plan_legend_names: list[str], plan_colors: list[str],
                            do_small_histogram_pics: bool) -> None:
     chamber_pretty_name = get_chamber_pretty_name(chamber)
@@ -483,27 +486,23 @@ if __name__ == '__main__':
     def main():
         directory = 'C:/Users/rob/projects/election/rob/'
 
-        chamber = 'TXSN'  # 'USCD'  # 'TXHD'  #
-        seed_description, ensemble_number = cm.get_current_ensemble(chamber)
-
         if True:
-            for chamber in ['USCD', 'TXHD']:
+            for chamber in ['TXHD']:
                 print(f"Saving plots for {chamber}")
                 current_plan = cm.determine_original_plan(chamber)
-                plans_to_ignore = set()
-                if current_plan is not None:
-                    plans_to_ignore.add(current_plan)
 
                 comparison_plans = sorted(
-                    list(pp.get_valid_plans(chamber, pp.build_plans_directory(directory)) - plans_to_ignore),
+                    list(pp.get_valid_plans(chamber, pp.build_plans_directory(directory)) - {2100}),
                     reverse=True)
                 # comparison_plans = [2168]
 
+                seed_description, ensemble_number = cm.get_current_ensemble(chamber)
                 save_plots(chamber, directory, seed_description, ensemble_number, current_plan, comparison_plans)
 
         if False:
             register_colormap()
 
+            chamber = 'TXSN'  # 'USCD'  # 'TXHD'  #
             settings = cm.build_proposed_plan_simulation_settings(chamber, 2176)
             geodata = si.load_geodataframe(directory, settings.redistricting_data_filename)
             graph = si.load_graph_with_geometry(directory, settings.networkX_graph_filename, geodata)
