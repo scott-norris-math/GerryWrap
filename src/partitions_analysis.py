@@ -341,8 +341,8 @@ if __name__ == '__main__':
 
             seeds_directory = cm.build_seeds_directory(directory)
             settings = cm.build_TXSN_random_seed_simulation_settings()
-            networkX_graph = nx.read_gpickle(seeds_directory + settings.networkX_graph_filename)
-            total_populations = [(x, y['total_pop']) for x, y in networkX_graph.nodes.items()]
+            dual_graph = nx.read_gpickle(seeds_directory + settings.dual_graph_filename)
+            total_populations = [(x, y['total_pop']) for x, y in dual_graph.nodes.items()]
             node_weights = np.array([y for _, y in sorted(total_populations, key=lambda x: x[0])])
 
             value_type = 'uint'

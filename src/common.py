@@ -282,7 +282,7 @@ def determine_population_limit(chamber: str) -> float:
 
 def build_proposed_plan_simulation_settings(chamber: str, plan: int) -> Dict:
     settings = Dict()
-    settings.networkX_graph_filename = f'graph_TX_2020_cntyvtd_{chamber}_{plan}.gpickle'
+    settings.dual_graph_filename = f'graph_TX_2020_cntyvtd_{chamber}_{plan}.gpickle'
     settings.redistricting_data_filename = f'nodes_TX_2020_cntyvtd_{chamber}_{plan}.parquet'
     settings.country_district_graph_filename = f'adj_TX_2020_cntyvtd_{chamber}_{plan}.gpickle'
     settings.epsilon = determine_population_limit(chamber)
@@ -291,7 +291,7 @@ def build_proposed_plan_simulation_settings(chamber: str, plan: int) -> Dict:
 
 def build_TXSN_random_seed_simulation_settings() -> Dict:
     settings = Dict()
-    settings.networkX_graph_filename = 'graph_TX_2020_cntyvtd_TXSN_seed_1000000.gpickle'
+    settings.dual_graph_filename = 'graph_TX_2020_cntyvtd_TXSN_seed_1000000.gpickle'
     settings.epsilon = determine_population_limit('TXSN')
     return settings
 

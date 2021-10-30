@@ -47,6 +47,7 @@ def save_report(chamber: str, directory: str, j2_template: jinja2.Template, plan
     cm.save_all_text(rendered_tex, rendered_tex_path)
 
     compile_pdf(report_directory, rendered_tex_filename, report_filename_prefix)
+    compile_pdf(report_directory, rendered_tex_filename, report_filename_prefix)
 
 
 def build_reports_directory(directory: str) -> str:
@@ -75,13 +76,15 @@ if __name__ == '__main__':
             loader=jinja2.FileSystemLoader(template_directory)
         )
 
-        j2_template = latex_jinja_env.get_template('Stmt-on-C2135-ForHouse.tex')
+        j2_template = latex_jinja_env.get_template('Stmt-on-template.tex')
 
-        chamber = 'USCD'
+        for chamber in cm.CHAMBERS:
+            print(f"Chamber: {chamber}")
 
-        plan = 2135
-
-        save_report(chamber, directory, j2_template, plan)
+            plans = sorted(list(pp.get_valid_plans(chamber, pp.build_plans_directory(directory)) - {2100}))
+            for plan in plans:
+                print(f"Plan: {plan}")
+                save_report(chamber, directory, j2_template, plan)
 
 
     main()

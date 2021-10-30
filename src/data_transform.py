@@ -184,7 +184,7 @@ def combine_and_fix_redistricting_data_file(directory: str) -> None:
     combined.to_csv(output_prefix + '.csv', index=False)
 
 
-def save_ensemble_matrices(chamber: str, directory: str, redistricting_data_filename: str, networkX_graph,
+def save_ensemble_matrices(chamber: str, directory: str, redistricting_data_filename: str, graph: nx.Graph,
                            ensemble_description: str) -> None:
     node_data = load_filtered_redistricting_data(directory, redistricting_data_filename)
     with Timer(name='load_plans'):
@@ -196,25 +196,23 @@ def save_ensemble_matrices(chamber: str, directory: str, redistricting_data_file
                          statistics_settings}
 
     print(f"Original length of Redistricting Data: {len(node_data)}")
-    geoids = sorted(networkX_graph.nodes())
+    geoids = list(sorted(graph.nodes()))
     geoids_lookup = set(geoids)
     node_data = node_data[node_data['geoid'].isin(geoids_lookup)]
     for current_plan, plan in enumerate(plans):
         if current_plan % 1000 == 0:
-            print(
-                f"{datetime.now().strftime('%H:%M:%S')} {current_plan}")
-
-        assignment = {x: int(y) for x, y in zip(geoids, plan)}
+            print(f"{datetime.now().strftime('%H:%M:%S')} {current_plan}")
 
         if current_plan == 0:
-            print(f"Plan - Min District: {min(assignment.values())} Max District: {max(assignment.values())}")
+            print(f"Plan - Min District: {min(plan)} Max District: {max(plan)}")
             number_redistricting_data = len(node_data)
-            plan_length = len(assignment)
+            plan_length = len(plan)
             print(f"Redistricting Data: {number_redistricting_data} Plan: {plan_length}")
             if number_redistricting_data != plan_length:
                 raise RuntimeError("Length of redistricting data and first plan do not match.")
 
-        grouped = node_data.groupby(by=assignment)
+        node_data['assignment'] = plan
+        grouped = node_data.groupby('assignment')
         district_data = grouped.sum()
 
         district_data.sort_index(inplace=True)
@@ -284,10 +282,10 @@ if __name__ == '__main__':
             settings = cm.build_TXSN_random_seed_simulation_settings()
 
             seeds_directory = cm.build_seeds_directory(directory)
-            networkX_graph = nx.read_gpickle(seeds_directory + settings.networkX_graph_filename)
+            dual_graph = nx.read_gpickle(seeds_directory + settings.dual_graph_filename)
 
             ensemble_description = 'TXSN_random_seed_test_2'
-            save_ensemble_matrices('TXSN', directory, 'nodes_TX_2020_cnty_cntyvtd_sldu.parquet', networkX_graph,
+            save_ensemble_matrices('TXSN', directory, 'nodes_TX_2020_cnty_cntyvtd_sldu.parquet', dual_graph,
                                    ensemble_description)
 
         if False:

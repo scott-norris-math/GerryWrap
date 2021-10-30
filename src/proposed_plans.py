@@ -519,8 +519,8 @@ def analyze_bef_assignments(chamber: str, directory: str, plan: int) -> None:
 
 
 def analyze_proposed_plan_seed_assignments(chamber: str, root_directory: str, plan: int) -> dict:
-    networkXGraph = nx.read_gpickle(f'{root_directory}seeds/graph_TX_2020_cntyvtd_{chamber}_{plan}.gpickle')
-    nodes = networkXGraph.nodes
+    graph = nx.read_gpickle(f'{root_directory}seeds/graph_TX_2020_cntyvtd_{chamber}_{plan}.gpickle')
+    nodes = graph.nodes
 
     node_districts = [(x, y['district'], cm.count_groups(y['node_districts'].split(','))) for x, y in nodes.items()]
     print(node_districts)

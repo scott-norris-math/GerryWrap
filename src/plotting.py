@@ -505,7 +505,7 @@ if __name__ == '__main__':
             chamber = 'TXSN'  # 'USCD'  # 'TXHD'  #
             settings = cm.build_proposed_plan_simulation_settings(chamber, 2176)
             geodata = si.load_geodataframe(directory, settings.redistricting_data_filename)
-            graph = si.load_graph_with_geometry(directory, settings.networkX_graph_filename, geodata)
+            graph = si.load_graph_with_geometry(directory, settings.dual_graph_filename, geodata)
 
             seed_description, ensemble_number = cm.get_current_ensemble(chamber)
             ensemble_description = cm.build_ensemble_description(chamber, seed_description, ensemble_number)

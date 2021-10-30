@@ -13,7 +13,7 @@ import networkx as nx
 from datetime import datetime
 from shapely import wkt
 from collections import defaultdict
-from typing import Iterable, Any, NamedTuple, Callable
+from typing import Iterable, Any, NamedTuple, Callable, Optional
 import pickle
 from addict import Dict
 import math
@@ -91,9 +91,9 @@ def fix_election_columns_text(df: pd.DataFrame) -> None:
 
 def load_graph_with_geometry(directory: str, dual_graph_filename: str, geodata: gpd.GeoDataFrame) -> Graph:
     seeds_directory = cm.build_seeds_directory(directory)
-    networkXGraph = nx.read_gpickle(seeds_directory + dual_graph_filename)
+    dual_graph = nx.read_gpickle(seeds_directory + dual_graph_filename)
 
-    graph = Graph(networkXGraph, geometry=geodata)
+    graph = Graph(dual_graph, geometry=geodata)
     graph.join(geodata, columns=['geometry'], right_index='geoid')
 
     # TODO: this may be unnecessary - check
@@ -165,7 +165,7 @@ def load_county_district_graph(directory: str, filename: str) -> nx.Graph:
 def build_chain(chamber: str, directory: str, settings, number_steps: int) -> tuple[MarkovChain, Iterable[Election]]:
     geodata = load_geodataframe(directory, settings.redistricting_data_filename)
 
-    graph = load_graph_with_geometry(directory, settings.networkX_graph_filename, geodata)
+    graph = load_graph_with_geometry(directory, settings.dual_graph_filename, geodata)
     join_data_to_dual_graph(graph, geodata)
 
     updaters, elections = build_updaters()
@@ -245,7 +245,7 @@ def run_chain_impl(chain: MarkovChain, elections: Iterable[Election], output_dir
     if initialize_data is not None:
         data = initialize_data(chain.total_steps, elections)
 
-    plans_array = None
+    plans_array: np.ndarray[Any, Any]
     plans_output_size = 100000
     step_number = 0
     maps_directory = build_maps_directory(output_directory)
@@ -503,8 +503,8 @@ def build_county_district_graph(dual_graph: nx.Graph, assignment: dict[str, int]
     return graph
 
 
-def update_county_district_graph(dual_graph: nx.Graph, county_district_graph: nx.Graph, old_assignment: dict[str, id],
-                                 new_assignment: dict[str, id], copy_graph: bool) -> nx.Graph:
+def update_county_district_graph(dual_graph: nx.Graph, county_district_graph: nx.Graph, old_assignment: dict[str, int],
+                                 new_assignment: dict[str, int], copy_graph: bool) -> nx.Graph:
     raise RuntimeError("Implementation does not work. FIXME before using.")
 
     updated_graph = copy.deepcopy(county_district_graph) if copy_graph else county_district_graph
@@ -614,7 +614,7 @@ def calculate_defects_iterative(dual_graph: nx.Graph, initial_assignment: dict[s
     previous_assignment = initial_assignment
     defects = []
     county_district_graph = None
-    counties = None
+    counties: Iterable[str]
     for i, plan in enumerate(plans):
         if i % 1000 == 0:
             print(i)

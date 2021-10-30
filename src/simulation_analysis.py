@@ -263,30 +263,34 @@ def determine_isolated_edges(graph: nx.Graph, isolated_counties: Iterable[str]) 
     return edges
 
 
-def remove_isolated_county_edges(networkX_graph: nx.Graph, county_district_graph: nx.Graph,
+def remove_isolated_county_edges(dual_graph: nx.Graph, county_district_graph: nx.Graph,
                                  minimum_whole_counties: int) -> None:
     counties = si.extract_counties(county_district_graph)
 
     isolated_counties = si.determine_isolated_counties(county_district_graph, counties, minimum_whole_counties)
     print(f"Isolated Counties: {sorted(isolated_counties)}")
 
-    edges = determine_isolated_edges(networkX_graph, isolated_counties)
-    # print(f'{len(edges)} of {len(networkX_graph.edges())}')
-    networkX_graph.remove_edges_from(edges)
-    # edges = determine_isolated_edges(networkX_graph, isolated_counties)
-    # print(f'{len(edges)} of {len(networkX_graph.edges())}')
+    edges = determine_isolated_edges(dual_graph, isolated_counties)
+    dual_graph.remove_edges_from(edges)
+
+
+def save_reduced_dual_graph(directory: str, reduced_graph_filename_prefix: str, dual_graph: nx.Graph,
+                            county_district_graph: nx.Graph, minimum_whole_counties: int):
+    remove_isolated_county_edges(dual_graph, county_district_graph, minimum_whole_counties)
+    seeds_working_directory = build_seeds_working_directory(directory)
+    nx.write_gpickle(dual_graph, f'{seeds_working_directory}{reduced_graph_filename_prefix}.gpickle')
 
 
 def build_region_plans_path(ensemble_directory: str, region: str) -> str:
     return f'{ensemble_directory}/{region}_plans.npz'
 
 
-def verify_uniqueness(region_plans_lookup: dict[str, np.ndarray]) -> None:
+def verify_region_district_uniqueness(region_plans_lookup: dict[str, np.ndarray]) -> None:
     for region, region_plans in region_plans_lookup.items():
         print(region)
         previous_unique_districts = None
-        for row in region_plans:
-            unique_districts = set(row)
+        for plan in region_plans:
+            unique_districts = set(plan)
             if previous_unique_districts is None:
                 print(f"Unique Districts: {len(unique_districts)}")
                 previous_unique_districts = unique_districts
@@ -322,10 +326,10 @@ def calculate_plan_defect(dual_graph: nx.Graph, counties: set[str], whole_target
     return si.calculate_defect(county_district_graph, counties)
 
 
-def calculate_plans_defects(networkX_graph: nx.Graph, county_district_graph: nx.Graph, plans: np.ndarray) -> list[int]:
+def calculate_plans_defects(dual_graph: nx.Graph, county_district_graph: nx.Graph, plans: np.ndarray) -> list[int]:
     whole_targets, intersect_targets = si.extract_defect_targets(county_district_graph)
     counties = si.extract_counties(county_district_graph)
-    defects = calculate_defects(networkX_graph, counties, whole_targets, intersect_targets, plans)
+    defects = calculate_defects(dual_graph, counties, whole_targets, intersect_targets, plans)
     print(f"Defect Groups: {cm.count_groups(defects)}")
     return defects
 
@@ -361,17 +365,17 @@ def save_unique_region_plans(directory: str, ensemble_description: str, dual_gra
         np.savez_compressed(build_region_plans_path(ensemble_directory, region), unique_region_plans)
 
 
-def save_region_product_ensemble(chamber: str, ensemble_directory: str, product_ensemble_directory: str,
+def save_region_product_ensemble(chamber: str, reduced_ensemble_directory: str, product_ensemble_directory: str,
                                  dual_graph: nx.Graph, county_district_graph: nx.Graph) -> None:
     whole_targets, intersect_targets = si.extract_defect_targets(county_district_graph)
     counties = si.extract_counties(county_district_graph)
 
     regions = ["Bexar", "Dallas", "Harris", "Tarrant", "Remaining"]
-    region_plans_lookup = {x: cm.load_plans_from_path(build_region_plans_path(ensemble_directory, x))
+    region_plans_lookup = {x: cm.load_plans_from_path(build_region_plans_path(reduced_ensemble_directory, x))
                            for x in regions}
-    verify_uniqueness(region_plans_lookup)
+    verify_region_district_uniqueness(region_plans_lookup)
 
-    region_indices_lookup = cm.load_pickle(build_region_indices_path(ensemble_directory))
+    region_indices_lookup = cm.load_pickle(build_region_indices_path(reduced_ensemble_directory))
     min_index = min([min(x) for x in region_indices_lookup.values()])
     max_index = max([max(x) for x in region_indices_lookup.values()])
     print(f"{min_index} {max_index}")
@@ -386,8 +390,7 @@ def save_region_product_ensemble(chamber: str, ensemble_directory: str, product_
 
     while current_plan < number_plans:
         if current_plan % 10000 == 0:
-            print(
-                f"{datetime.now().strftime('%H:%M:%S')} {current_plan} Number Collisions: {number_collisions}")
+            print(f"{datetime.now().strftime('%H:%M:%S')} {current_plan} Number Collisions: {number_collisions}")
 
         for region, region_indices in region_indices_lookup.items():
             region_plan = random.choice(region_plans_lookup[region])
@@ -414,33 +417,42 @@ def save_region_product_ensemble(chamber: str, ensemble_directory: str, product_
 
 if __name__ == '__main__':
     def main():
-        chamber = 'TXHD'
         directory = 'C:/Users/rob/projects/election/rob/'
-        settings = cm.build_proposed_plan_simulation_settings(chamber, 2176)
+
+        chamber = 'TXHD'
+        plan = 2176
+        settings = cm.build_proposed_plan_simulation_settings(chamber, plan)
 
         seeds_directory = cm.build_seeds_directory(directory)
-        dual_graph = nx.read_gpickle(seeds_directory + settings.networkX_graph_filename)
+        dual_graph = nx.read_gpickle(seeds_directory + settings.dual_graph_filename)
         county_district_graph = si.load_county_district_graph(directory, settings.country_district_graph_filename)
 
-        ensemble_description = 'TXHD_2176_Reduced_3'
+        minimum_whole_counties = 4
+        reduced_ensemble_description = 'TXHD_2176_Reduced_3'
 
-        product_ensemble_description = 'TXHD_2176_product_1'
+        product_ensemble_description = f'{chamber}_{plan}_product_2'
         product_ensemble_directory = cm.build_ensemble_directory(directory, product_ensemble_description)
         cm.ensure_directory_exists(product_ensemble_directory)
 
-        if False:
-            # county_defects = si.calculate_county_defects(county_district_graph, counties)
-            remove_isolated_county_edges(dual_graph, county_district_graph, 4)
+        if True:
+            # Build the reduced graph without edges between isolated counties to speed up the simulation
+            reduced_graph_filename_prefix = settings.dual_graph_filename.replace('.gpickle', '_Reduced')
+            save_reduced_dual_graph(directory, reduced_graph_filename_prefix, dual_graph, county_district_graph,
+                                    minimum_whole_counties)
 
         if False:
             display_unique_plans_defects(ensemble_directory)
 
         if False:
-            isolated_counties = si.determine_isolated_counties(county_district_graph, counties, 4)
-            save_unique_region_plans(directory, ensemble_description, dual_graph, isolated_counties)
+            # It is assumed at this point that the reduced ensemble has been generated
+            # Break up the generated plans into regional plans
+            isolated_counties = si.determine_isolated_counties(county_district_graph, counties, minimum_whole_counties)
+            save_unique_region_plans(directory, reduced_ensemble_description, dual_graph, isolated_counties)
 
         if False:
-            save_region_product_ensemble(chamber, ensemble_directory, product_ensemble_directory, dual_graph,
+            # Randomly join together regional plans to form product plans
+            reduced_ensemble_directory = cm.build_ensemble_directory(directory, reduced_ensemble_description)
+            save_region_product_ensemble(chamber, reduced_ensemble_directory, product_ensemble_directory, dual_graph,
                                          county_district_graph)
 
         if False:
@@ -452,11 +464,13 @@ if __name__ == '__main__':
 
             np.savez_compressed(f'{product_ensemble_directory}defects.npz', np.array(defects))
 
-        if False:
+        if True:
+            # Build the desired ensemble matrices by joining product plans to data
             dt.save_ensemble_matrices(chamber, directory, settings.redistricting_data_filename, dual_graph,
                                       product_ensemble_description)
 
-        if True:
+        if False:
+            # Code for generating a seed from 2010 districts or from a plan file
             cm.ensure_directory_exists(build_seeds_working_directory(directory))
 
             chamber = 'TXHD'
