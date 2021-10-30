@@ -45,28 +45,36 @@ def assign_plan_districts(chamber: str, directory: str, data: pd.DataFrame, plan
     return data.join(plan_assignments, how='inner')
 
 
-def determine_node_ids(data: pd.DataFrame, geographic_unit: str) -> list[str]:
-    def determine_whole_counties(data: pd.DataFrame):
-        county_districts = set(zip(data['cnty'], data['district']))
-        county_groups = cm.groupby_project(list(county_districts), lambda x: x[0], lambda x: x[1])
-        return {x for x, y in county_groups if len(y) == 1}
+def build_node_data(data: pd.DataFrame, geographic_unit: str) -> pd.DataFrame:
+    def determine_node_ids(data: pd.DataFrame, geographic_unit: str) -> list[str]:
+        def determine_whole_counties(data: pd.DataFrame):
+            county_districts = set(zip(data['cnty'], data['district']))
+            county_groups = cm.groupby_project(list(county_districts), lambda x: x[0], lambda x: x[1])
+            return {x for x, y in county_groups if len(y) == 1}
 
-    def determine_non_whole_geographic_units(data: pd.DataFrame, geographic_unit: str) -> set[str]:
-        level_districts = set(zip(data[geographic_unit], data['district']))
-        level_groups = cm.groupby_project(list(level_districts), lambda x: x[0], lambda x: x[1])
-        return {x for x, y in level_groups if len(y) > 1}
+        def determine_non_whole_geographic_units(data: pd.DataFrame, geographic_unit: str) -> set[str]:
+            level_districts = set(zip(data[geographic_unit], data['district']))
+            level_groups = cm.groupby_project(list(level_districts), lambda x: x[0], lambda x: x[1])
+            return {x for x, y in level_groups if len(y) > 1}
 
-    whole_counties = determine_whole_counties(data)
-    non_whole_levels = determine_non_whole_geographic_units(data, geographic_unit)
-    return [build_node_id(x, y, z, whole_counties, non_whole_levels) for x, y, z in
-            zip(data['cnty'], data[geographic_unit], data['district'])]
+        def build_node_id(county: str, geographic_unit: str, district: int, whole_counties: set[str],
+                          non_whole_levels: set[str]) -> str:
+            if county in whole_counties:
+                return county
+            elif geographic_unit in non_whole_levels:
+                return f'{geographic_unit}_{district}'
+            else:
+                return geographic_unit
 
+        whole_counties = determine_whole_counties(data)
+        non_whole_levels = determine_non_whole_geographic_units(data, geographic_unit)
+        return [build_node_id(x, y, z, whole_counties, non_whole_levels) for x, y, z in
+                zip(data['cnty'], data[geographic_unit], data['district'])]
 
-def build_district_data(data: pd.DataFrame, geographic_unit: str) -> pd.DataFrame:
-    def f(group, state: dict[str, Any]):
+    def handle_non_numeric_columns(group, state: dict[str, Any]):
         group_number = state['group_number']
         if group_number % 1000 == 0:
-            print(group_number)
+            print(f"Building Node: {group_number}")
         state['group_number'] = group_number + 1
 
         results = {}
@@ -87,7 +95,9 @@ def build_district_data(data: pd.DataFrame, geographic_unit: str) -> pd.DataFram
 
     data['node_id'] = determine_node_ids(data, geographic_unit)
     grouped_by_node_ids = data.groupby('node_id')
-    grouped_data = pd.DataFrame(list(grouped_by_node_ids.apply(lambda x: f(x, {'group_number': 0}))))
+    state = {'group_number': 0}
+    grouped_data = pd.DataFrame(
+        list(grouped_by_node_ids.apply(lambda x: handle_non_numeric_columns(x, state))))
     grouped_data.set_index('geoid', drop=False, inplace=True)
     grouped_data_sum = grouped_by_node_ids.sum()
     node_data = grouped_data.join(grouped_data_sum, how='inner', rsuffix='_right')
@@ -99,62 +109,58 @@ def build_seeds_working_directory(directory: str) -> str:
     return f'{cm.build_seeds_directory(directory)}working/'
 
 
-def build_node_data_path(seeds_working_directory: str, stem: str) -> str:
-    return f'{seeds_working_directory}{stem}.parquet'
+def build_node_data_path(seeds_working_directory: str, seed_filename_prefix: str) -> str:
+    return f'{seeds_working_directory}{seed_filename_prefix}.parquet'
 
 
-def save_node_data(directory: str, stem: str, node_data: pd.DataFrame) -> None:
+def save_node_data(directory: str, seed_filename_prefix: str, node_data: pd.DataFrame) -> None:
     seeds_working_directory = build_seeds_working_directory(directory)
-    cm.ensure_directory_exists(seeds_working_directory)
 
     node_data['polygon'] = [x.wkt for x in node_data['polygon']]
-    node_data_path = build_node_data_path(seeds_working_directory, stem)
+    node_data_path = build_node_data_path(seeds_working_directory, seed_filename_prefix)
     node_data.to_parquet(node_data_path, index=False)
     # node_data.to_csv(f'{seeds_working_directory}{stem}.csv', index=False, quoting=csv.QUOTE_ALL)
 
 
-def load_node_data(directory: str, stem: str) -> pd.DataFrame:
+def build_seed_filename_prefix(chamber: str, geographic_unit: str, suffix: int) -> str:
+    return f'TX_2020_{geographic_unit}_{chamber}_{suffix}'
+
+
+def save_2010_node_data(chamber: str, directory: str, geographic_unit: str) -> None:
+    data = load_redistricting_data(directory)
+    assign_2010_districts(chamber, data)
+    node_data = build_node_data(data, geographic_unit)
+    seed_filename_prefix = build_seed_filename_prefix(chamber, geographic_unit, 2010)
+    save_node_data(directory, seed_filename_prefix, node_data)
+
+
+def save_plan_node_data(chamber: str, directory: str, geographic_unit: str, plan: int) -> None:
+    data = load_redistricting_data(directory)
+    plan_geoid_column = 'SCTBKEY'
+    plan_district_column = 'DISTRICT'
+    data = assign_plan_districts(chamber, directory, data, plan, plan_geoid_column, plan_district_column)
+    node_data = build_node_data(data, geographic_unit)
+    seed_filename_prefix = build_seed_filename_prefix(chamber, geographic_unit, plan)
+    save_node_data(directory, seed_filename_prefix, node_data)
+
+
+def load_node_data(directory: str, seed_filename_prefix: str) -> pd.DataFrame:
     seeds_working_directory = build_seeds_working_directory(directory)
-    node_data_path = build_node_data_path(seeds_working_directory, stem)
+    node_data_path = build_node_data_path(seeds_working_directory, seed_filename_prefix)
     node_data = pd.read_parquet(node_data_path)
     node_data['polygon'] = node_data['polygon'].apply(sh.wkt.loads)
     node_data.set_index('geoid', drop=False, inplace=True)
     return node_data
 
 
-def build_node_id(county: str, geographic_unit: str, district: int, whole_counties: set[str],
-                  non_whole_levels: set[str]) -> str:
-    if county in whole_counties:
-        return county
-    elif geographic_unit in non_whole_levels:
-        return f'{geographic_unit}_{district}'
-    else:
-        return geographic_unit
-
-
-def get_components(G):
-    # get and sorted connected components by size
-    return sorted([tuple(x) for x in nx.connected_components(G)], key=lambda x: len(x), reverse=True)
-
-
-def district_view(G, D):
-    # get subgraph of a given district
-    return nx.subgraph_view(G, lambda x: G.nodes[x]['district'] == D)
-
-
-def get_components_district(G, D):
-    # get connected components of a district
-    return get_components(district_view(G, D))
-
-
-def build_graph(node_data: pd.DataFrame, seats: str) -> nx.Graph:
+def build_dual_graph(chamber: str, node_data: pd.DataFrame) -> nx.Graph:
     intersections = set()
     for i, (x_geoid, x_polygon, y_geoid, y_polygon) in \
             enumerate((x_geoid, x_polygon, y_geoid, y_polygon)
                       for x_geoid, x_polygon in zip(node_data['geoid'], node_data['polygon'])
                       for y_geoid, y_polygon in zip(node_data['geoid'], node_data['polygon']) if x_geoid < y_geoid):
         if i % 1000000 == 0:
-            print(i)
+            print("Determining Intersections: {i}")
 
         if x_polygon.intersects(y_polygon):
             intersection = x_polygon.intersection(y_polygon)
@@ -162,69 +168,89 @@ def build_graph(node_data: pd.DataFrame, seats: str) -> nx.Graph:
             if perimeter > .01:
                 intersections.add((x_geoid, y_geoid))
 
-    node_attr = ['geoid', 'county', 'district', 'total_pop', seats, 'aland', 'perim', 'node_geoids', 'node_districts']
+    seats_column = f'seats_{dt.get_census_chamber_name(chamber)}'
+    node_attr = ['geoid', 'county', 'district', 'total_pop', seats_column, 'aland', 'perim', 'node_geoids',
+                 'node_districts']
 
-    G = nx.from_edgelist(intersections)
+    graph = nx.from_edgelist(intersections)
     selected_node_data = node_data.filter(items=node_attr, axis='columns')
-    nx.set_node_attributes(G, selected_node_data.to_dict('index'))
+    nx.set_node_attributes(graph, selected_node_data.to_dict('index'))
 
-    # check for number of connected components and raise error
-    return G
+    # TODO: check for number of connected components and raise error
+    return graph
 
 
-def create_new_districts(G, current_number_districts, new_districts):
-    # to create new districts
+def add_new_districts(graph: nx.Graph, current_number_districts: int, new_districts: int, node_data: pd.DataFrame) \
+        -> None:
+    def get_sorted_connected_components(graph: nx.Graph) -> list[tuple[Any, ...]]:
+        return sorted([tuple(x) for x in nx.connected_components(graph)], key=lambda x: len(x), reverse=True)
+
+    def get_district_subgraph(graph: nx.Graph, district: int) -> nx.Graph:
+        return nx.subgraph_view(graph, lambda x: graph.nodes[x]['district'] == district)
+
+    def get_district_sorted_connected_components(graph: nx.Graph, district: int) -> list[tuple[Any, ...]]:
+        return get_sorted_connected_components(get_district_subgraph(graph, district))
+
     # Create new districts starting at nodes with high population
     new_district_starts = node_data.nlargest(10 * new_districts, 'total_pop').index.tolist()
-    D_new = current_number_districts + 1
+    next_district = current_number_districts + 1
     while new_districts > 0:
         # get most populous remaining node, make it a new district
         # check if this disconnected its old district.  If so, undo and try next node.
         n = new_district_starts.pop(0)
-        D_old = G.nodes[n]['district']
-        G.nodes[n]['district'] = D_new
-        comp = get_components_district(G, D_old)
+        D_old = graph.nodes[n]['district']
+        graph.nodes[n]['district'] = next_district
+        comp = get_district_sorted_connected_components(graph, D_old)
         if len(comp) == 1:
             # success
-            D_new += 1
+            next_district += 1
             new_districts -= 1
         else:
             # fail - disconnected old district - undo and try again
-            G.nodes[n]['district'] = D_old
+            graph.nodes[n]['district'] = D_old
 
 
-def build_country_district_graph(G, counties):
+def build_country_district_graph(chamber: str, dual_graph: nx.Graph) -> nx.Graph:
     # Create the county-district bi-partite adjacency graph.
     # This graph has 1 node for each county and district &
     # an edge for all (county, district) that intersect (share land).
     # It is an efficient tool to track map defect and other properties.
-    A = nx.Graph()
-    for n, data in G.nodes(data=True):
-        D = data['district']
-        A.add_node(D)  # adds district node if not already present
+    graph = nx.Graph()
+
+    seats_column = f'seats_{dt.get_census_chamber_name(chamber)}'
+
+    counties = set()
+    for n, data in dual_graph.nodes(data=True):
+        district = data['district']
+        graph.add_node(district)  # adds district node if not already present
         # A.nodes[D]['polsby_popper'] = 0
         for k in ['total_pop']:  # 'aland', 'perim']:
             try:
-                A.nodes[D][k] += data[k]  # add to attribute if exists
-            except e:
-                A.nodes[D][k] = data[k]  # else create attribute
+                graph.nodes[district][k] += data[k]  # add to attribute if exists
+            except BaseException:
+                graph.nodes[district][k] = data[k]  # else create attribute
 
-        C = data['county']  # get counties from here
-        A.add_node(C)  # adds county node if not already present
-        for k in ['total_pop', seats]:
+        county = data['county']
+        counties.add(county)
+        graph.add_node(county)  # adds county node if not already present
+        for k in ['total_pop', seats_column]:
             try:
-                A.nodes[C][k] += data[k]  # add to attribute if exists
-            except e:
-                A.nodes[C][k] = data[k]  # else create attribute
+                graph.nodes[county][k] += data[k]  # add to attribute if exists
+            except BaseException:
+                graph.nodes[county][k] = data[k]  # else create attribute
 
-        A.add_edge(C, D)  # create edge
+        graph.add_edge(county, district)  # create edge
 
     # get defect targets
-    for C in counties:
-        A.nodes[C]['whole_target'] = int(np.floor(A.nodes[C][seats]))
-        A.nodes[C]['intersect_target'] = int(np.ceil(A.nodes[C][seats]))
+    for county in counties:
+        graph.nodes[county]['whole_target'] = int(np.floor(graph.nodes[county][seats_column]))
+        graph.nodes[county]['intersect_target'] = int(np.ceil(graph.nodes[county][seats_column]))
 
-    return A
+    return graph
+
+
+def save_graph_compressed_json(graph: nx.Graph, output_path: str) -> None:
+    cm.save_all_bytes(gzip.compress(bytes(nx.jit_data(graph, indent=4), 'utf-8')), output_path)
 
 
 def determine_isolated_edges(graph: nx.Graph, isolated_counties: Iterable[str]) -> list[tuple[str, str]]:
@@ -430,38 +456,38 @@ if __name__ == '__main__':
             dt.save_ensemble_matrices(chamber, directory, settings.redistricting_data_filename, dual_graph,
                                       product_ensemble_description)
 
-        if False:
-            #  ################ set parameters #################
+        if True:
+            cm.ensure_directory_exists(build_seeds_working_directory(directory))
+
             chamber = 'TXHD'
-            level = 'cntyvtd'
-            plan = 2176
-            contract = 'proposal_v2'
+            geographic_unit = 'cntyvtd'
 
-            # assumes there is a table in dataset called "nodes_TX_2020_raw"
-            # if proposal is not '', there must also be a table with this name
-            # writes graph files to the specified local directory
-
-            if contract == 'proposal':
-                stem = f'TX_2020_{level}_{chamber}_{plan}_v1'
-            elif contract == 'proposal_v2':
-                stem = f'TX_2020_{level}_{chamber}_{plan}'
+            create_plan_graph = False
+            if create_plan_graph:
+                plan = 2176
+                save_plan_node_data(chamber, directory, geographic_unit, plan)
+                seed_filename_prefix = build_seed_filename_prefix(chamber, geographic_unit, plan)
             else:
-                stem = f'TX_2020_{level}_{chamber}_contract{contract}'
+                save_2010_node_data(chamber, directory, geographic_unit)
+                seed_filename_prefix = build_seed_filename_prefix(chamber, geographic_unit, 2010)
 
-            district_type = dt.get_census_chamber_name(chamber)
-            seats = f'seats_{district_type}'
+            node_data = load_node_data(directory, seed_filename_prefix)
+            dual_graph = build_dual_graph(chamber, node_data)
 
-            plan_geoid_column = 'SCTBKEY'
-            plan_district_column = 'DISTRICT'
+            if not create_plan_graph and chamber == 'USCD':
+                add_new_districts(dual_graph, 36, 2, node_data)
 
-            save_all_bytes(gzip.compress(bytes(nx.jit_data(G, indent=4), 'utf-8')),
-                           f'{seeds_working_directory}graph.json.gz')
+            seeds_working_directory = build_seeds_working_directory(directory)
 
-            graph_file = f'{seeds_working_directory}graph_{stem}.gpickle'
-            adj_file = f'{seeds_working_directory}adj_{stem}.gpickle'
+            dual_graph_path_prefix = f'{seeds_working_directory}graph_{seed_filename_prefix}'
+            nx.write_gpickle(dual_graph, dual_graph_path_prefix + '.gpickle')
+            save_graph_compressed_json(dual_graph, dual_graph_path_prefix + '.json.gz')
 
-            nx.write_gpickle(G, graph_file)
-            nx.write_gpickle(A, adj_file)
+            county_district_graph = build_country_district_graph(chamber, dual_graph)
+
+            county_district_graph_path_prefix = f'{seeds_working_directory}adj_{seed_filename_prefix}'
+            nx.write_gpickle(county_district_graph, county_district_graph_path_prefix + '.gpickle')
+            save_graph_compressed_json(county_district_graph, county_district_graph_path_prefix + '.json.gz')
 
 
     main()
