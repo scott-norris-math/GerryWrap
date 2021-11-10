@@ -1,0 +1,318 @@
+\pdfsuppresswarningpagegroup=1
+
+% This file was converted to LaTeX by Writer2LaTeX ver. 1.6.1
+% see http://writer2latex.sourceforge.net for more info
+\documentclass[letterpaper]{article}
+\usepackage[latin1]{inputenc}
+\usepackage{amsmath}
+\usepackage{amssymb,amsfonts,textcomp}
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+\usepackage{color}
+\usepackage{array}
+\usepackage{supertabular}
+\usepackage{hhline}
+\usepackage{hyperref}
+\usepackage{caption}
+\hypersetup{pdftex, colorlinks=true, linkcolor=blue, citecolor=blue, filecolor=blue, urlcolor=blue, pdftitle=, pdfauthor=Barreiro; Andrea, pdfsubject=, pdfkeywords=}
+\usepackage[pdftex]{graphicx}
+% Text styles
+\newcommand\textstyleInternetlink[1]{\textcolor[rgb]{0.019607844,0.3882353,0.75686276}{#1}}
+\newcommand\textstylenormaltextrun[1]{#1}
+\newcommand\textstyleeop[1]{#1}
+% Page layout (geometry)
+\setlength\voffset{-1in}
+\setlength\hoffset{-1in}
+\setlength\topmargin{0.5in}
+\setlength\oddsidemargin{1in}
+\setlength\textheight{8.079599in}
+\setlength\textwidth{6.5in}
+\setlength\footskip{0.9602in}
+\setlength\headheight{0.5in}
+\setlength\headsep{0.4602in}
+% Footnote rule
+\setlength{\skip\footins}{0.0469in}
+\renewcommand\footnoterule{\vspace*{-0.0071in}\setlength\leftskip{0pt}\setlength\rightskip{0pt plus 1fil}\noindent\textcolor{black}{\rule{0.25\columnwidth}{0.0071in}}\vspace*{0.0398in}}
+% Pages styles
+\makeatletter
+
+\newcommand{\VAR}[1] {$#1$}
+
+\newcommand\ps@Standard{
+  \renewcommand\@oddhead{}
+  \renewcommand\@evenhead{\@oddhead}
+  \renewcommand\@oddfoot{}
+  \renewcommand\@evenfoot{\@oddfoot}
+  \renewcommand\thepage{\arabic{page}}
+}
+\makeatother
+\pagestyle{Standard}
+\setlength\tabcolsep{1mm}
+\renewcommand\arraystretch{1.3}
+% List styles
+\newcommand\liststyleWWNumii{%
+\renewcommand\labelitemi{[F0B7?]}
+\renewcommand\labelitemii{o}
+\renewcommand\labelitemiii{[F0A7?]}
+\renewcommand\labelitemiv{[F0B7?]}
+}
+\newcommand\liststyleWWNumiii{%
+\renewcommand\labelitemi{[F0B7?]}
+\renewcommand\labelitemii{o}
+\renewcommand\labelitemiii{[F0A7?]}
+\renewcommand\labelitemiv{[F0B7?]}
+}
+\newcommand\liststyleWWNumiv{%
+\renewcommand\labelitemi{[F0B7?]}
+\renewcommand\labelitemii{o}
+\renewcommand\labelitemiii{[F0A7?]}
+\renewcommand\labelitemiv{[F0B7?]}
+}
+\newcommand\liststyleWWNumi{%
+\renewcommand\labelitemi{{\textperiodcentered}}
+\renewcommand\labelitemii{o}
+\renewcommand\labelitemiii{[F0A7?]}
+\renewcommand\labelitemiv{[F0B7?]}
+}
+
+
+\title{}
+\author{Barreiro, Andrea}
+%\date{2021-10-13}
+\begin{document}
+\textbf{\textit{MUM\_TX Statement on \VAR{plan_name}}}
+
+\bigskip
+
+%Tuesday, October 12, 2021
+\textbf{\textit{Math For Unbiased Maps TX (MUM\_TX) }}is\textbf{\textit{ }}an interdisciplinary, nonpartisan coalition
+of Texas mathematicians, political scientists and philosophers working to ensure a fair and transparent redistricting
+process. Our research concerns the development and application of ensemble sampling techniques, and in particular their
+application to the current TX redistricting cycle. In brief, we use \textit{Markov Chain Monte Carlo }techniques to
+generate a large number of random, legally valid maps which can then be used as an unbiased baseline to understand what
+a typical map should look like. Conversely, when a proposed map is an outlier from the ensemble, this may be an
+indication of gerrymandering.
+
+\bigskip
+
+We have applied our methods to the Congressional maps that have been made available by the Texas Legislative Council. 
+%As of 10/12/21, we have seen a large number of maps posted, culminating in \VAR{plan_name} which is now being considered by the House. 
+We generated a table of two important statistics that are commonly used by political scientists to assess
+partisan gerrymandering: the mean-median score and partisan bias score. \ You can find the table at our webpage:
+\href{http://www.smu.edu/Dedman/Research/Institutes-and-Centers/DCII/Scholarship/Research-Cluster-on-Political-Decision-Making/TXGerryWatch}{\textstyleInternetlink{www.smu.edu/Dedman/Research/Institutes-and-Centers/DCII/Scholarship/Research-Cluster-on-Political-Decision-Making/TXGerryWatch}}.
+
+%Unfortunately, our assessment of 10/12/21 is not complementary: \VAR{plan_name} is (1) egregiously gerrymandered to reduce the competitiveness of nearly every congressional district, and (2) manipulated to give the Republican Party, in
+%particular, an outsized advantage, completely unlike any plan in our unbiased ensemble. The result is that nearly every
+%district (both Republican AND Democratic) is uncompetitive in a general election, and that among these there are far
+%too few Democratic districts, given the actual political leanings of Texan voters. Finally (3) minority voters are
+%``cracked and packed'' into a few overwhelmingly minority districts, at the cost of decreasing the total number of
+%districts which would allow minority communities to elect candidates of their choice.
+
+
+\bigskip
+
+% We focus on \VAR{plan_name}, which is the map currently under consideration. 
+We compared the proposed map to an \textit{ensemble} of \VAR{number_plans} randomly-drawn maps. \ \ \ In Figure~\ref{fig:1}, districts are ordered by the number of votes a Democratic
+candidate for US Congress would have received in the 2020 election, had voters used ``straight ticket'' voting. \ On
+average, maps within our ensemble (blue dots) exhibit smoothly increasing vote shares as one moves from
+Republican-leaning to Democratic-leaning districts. \ This smooth increase is the hallmark of an unbiased map. 
+%\ \ But in the proposed map (red dots), the increase is highly disjointed, a clear sign of gerrymandering.
+
+\begin{figure*}
+\hspace*{-1.5cm}
+\includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}seats-voteshares-ensemble-comps-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-PRES20.pdf}
+\caption{}
+\label{fig:1}
+\end{figure*}
+
+\bigskip
+
+\begin{figure*}
+{\centering \includegraphics[width=6.5in,height=3.5in]{\VAR{plots_directory}seats-voteshares-ensemble-enacted-\VAR{chamber}-\VAR{plan}-PRES20.pdf} \par}
+\caption{}
+\label{fig:2}
+\end{figure*}
+
+In Figure~\ref{fig:2}, we show the same data, but now identify two signatures of gerrymandering: ``cracking'' (where opposition voters are diluted to create safe districts for the majority) and ``packing'' (where these voters are concentrated to dilute their overall voting power).
+
+\bigskip
+
+% We note several specific features of the proposed plan. First, Democratic voters are disproportionately removed from a
+% swath of districts in between 10 and 15 (District numbers are along the x-axis) that would be competitive in an
+% unbiased map (a process known as ``cracking''), and placed into uncompetitive districts such as 7, 32, 20, 29, 35, 18,
+% and 33 (a process known as ``packing''). \ Second, the list of outcomes between Districts 2 and 3 (a total of 13
+% districts) is very nearly flat, which is a hallmark of maps created with the assistance of computer algorithms designed
+% to automate the gerrymandering process. \ Finally, the predicted vote share between Districts 15 and 7 changes abruptly
+% by about \textit{20 points, }with only 2 districts in between (28 and 34)\textit{ }{}-{}- this represents a ``wall''
+% designed to protect legislators from changing voter opinions over time (see actual district numbers on the previous
+% figure).
+
+We also compute two common numbers that political scientists use to ``score'' maps. \ The first such number is called
+the ``mean-median'' score: the difference in statewide vote percentage each party would need to win the majority of the
+chamber. %\ For the proposed map, the Republican Party would need to win only \textbf{42.2\%} of the vote to win 19
+%seats, while the Democratic Party would need to earn \textbf{57.8\%}; the difference of these numbers gives a
+%``mean-median'' score of \textbf{15.6 }(note: to get these numbers from the figure, scale up by a factor of 100). 
+The second such score is called the ``partisan bias'' score: \ the difference in the number of seats each party wins if
+each were to earn 50\% of the vote. 
+%\ For the proposed map, the Republican Party would win \textbf{24 seats} with 50\%
+%of the vote, while the Democratic Party would win only \textbf{14 seats}; the difference of these numbers gives a
+%``partisan bias'' score of \textbf{{}--10}. \textstylenormaltextrun{In contrast, the median map in our ensemble has a
+%mean-median score of \textbf{{}--2.2} and a partisan bias of \textbf{2} (when the statewide vote splits 50-50, the
+%Republican Party wins \textbf{18 }seats to the Democratic Party's \textbf{20}).}\textstyleeop{~}
+
+\begin{figure*}
+{\centering  \includegraphics[width=5.8154in,height=3.1311in]{\VAR{plots_directory}mean-median-partisan-bias-ensemble-enacted-\VAR{chamber}-\VAR{plan}-PRES20.pdf}  \\
+ \includegraphics[width=5.6909in,height=4.3752in]{\VAR{plots_directory}partisan-metrics-2D-\VAR{chamber}-\VAR{plan}-PRES20.pdf} \par}
+\caption{}
+\label{fig:3}
+\end{figure*}
+
+
+\bigskip
+
+
+Of course, no plan is going to be perfectly aligned with the ensemble, so just how gerrymandered is this plan? \ A
+little? \ A lot? \ An extreme amount? \ This question can be answered using statistics, by comparing each score above
+to the \textit{distribution }of those scores within the \VAR{number_plans} - map ensemble. \ This is done in Figure~\ref{fig:3}.  The second row shows the joint distribution of mean-median and partisan bias. 
+
+\begin{figure*}
+{\centering \includegraphics[width=6.5in,height=3.5in]{\VAR{plots_directory}violin-plot-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-BHVAP.pdf} \par}
+\caption{}
+\label{fig:4}
+\end{figure*}
+
+\bigskip
+
+In Figure~\ref{fig:4} we present another ``violin'' plot, but with districts sorted according to the
+the fraction of the voting age population that is Black + Hispanic. 
+
+%This is vividly illustrated by the 2D histogram showing the joint distribution of these scores across the ensemble (the
+%plot has been smoothed for visualization, as partisan bias is integer-valued). Another evident fact from this histogram
+%is that there is no good reason why the legislature must pick such a manipulated map; there are literally hundreds of
+%thousands of maps that are less biased.
+
+%, and the results are disappointing. \ As shown in the following figure, both the ``mean-median'' and ``partisan bias''
+% scores are very far from their typical values within an unbiased ensemble. \ In fact, both the mean-median and the
+% partisan bias scores were more extreme than any value we saw in our ensemble. \textbf{Not a single map} in our ensemble
+% had a mean-median score greater than that of the proposed map, and \textbf{not a single map} had a partisan bias score
+% as negative. 
+
+%\ \ We clearly observe the same type of trend as in the
+%sorting by parties: \ some districts (19, 8, 6) all contain many fewer Black + Hispanic voters than would be expected
+%from an unbiased map, whereas others (23, 9, 30) all contain many more Black + Hispanic voters than would be expected.
+%\ The story is essentially identical to that observed above -- SB6 removes Black and Hispanic voters from districts
+%where they form a near majority, and their voices might influence election outcomes, into districts where they already
+%form a large majority.}
+
+
+\bigskip
+
+We next ask the question ``How many Districts have an BHVAP over 50\%?'' (or 60\%, or 70\%, etc..). The
+BHVAP is the combined Black and Hispanic voting age population. These histograms show the values for the ensemble, and
+the value for the Proposed map is shown in red. In Figure~\ref{fig:5} we show the number of districts that have BHVAP above 50\% and 70\%; that is the number of districts that are majority-minority, vs. the number of Districts that are
+\textbf{\textit{overwhelmingly}} majority-minority. 
+
+\begin{figure*}
+\begin{flushleft}
+\tablefirsthead{}
+\tablehead{}
+\tabletail{}
+\tablelasttail{}
+\begin{supertabular}{|l|l|}
+\hline
+\selectlanguage{english}  \includegraphics[width=3.2902in,height=2.1945in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-BHVAP-0.5.pdf}  &
+\selectlanguage{english}  \includegraphics[width=3.2902in,height=2.1945in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-BHVAP-0.7.pdf} \\\hline
+\end{supertabular}
+\end{flushleft}
+\caption{}
+\label{fig:5}
+\end{figure*}
+
+
+%Here is what we observe:
+
+%\liststyleWWNumi
+%\begin{itemize}
+%\item The number of majority-minority districts in the Proposed plan (\VAR{plan_name}) is much lower than the typical %value in the
+%ensemble (14 vs. 16-17).
+%\item The number of overwhelmingly majority-minority districts is higher than the typical value in the ensemble (10 vs.
+%6).
+%\item This suggest that minority voters have been packed into a small number of districts, at the cost of reducing the
+%total number of districts in which they may be able to elect representatives of their choice.
+%\end{itemize}
+
+%In summary, \VAR{plan_name} fails Texas voters by gerrymandering along both partisan and racial dimensions. First, this map
+%artificially reduces the competitiveness of a large number of districts: \textit{at most} 3 out of 38 districts might
+%charitably be viewed as competitive in a general election. The map also inflates the advantage to the Republican Party,
+%in comparison to a typical unbiased map; an unbiased map would be closely balanced between the parties (and far more
+%reflective of the views of actual Texas voters, who voted 54\% to 46\% in the 2020 election). Second, this map packs
+%Black and Hispanic voters into a relatively small number of overwhelmingly minority districts, at the cost of reducing
+%the total number of districts which effectively perform for minorities. We urge legislators to go back to the drawing
+%board and return with a map that is fair to Texas voters.
+
+
+\bigskip
+
+\section*{Appendix: All Plots}
+
+{\centering \includegraphics[width=7.3307in,height=7in]{\VAR{report_directory}report_\VAR{plan_name}_diff_map.pdf} \par}
+
+{\centering \includegraphics[width=7.3307in,height=3.5in]{\VAR{plots_directory}seats-voteshares-ensemble-comps-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-PRES20.pdf} \par}
+{\centering \includegraphics[width=7.3307in,height=3.5in]{\VAR{plots_directory}seats-voteshares-ensemble-comps-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-SEN20.pdf} \par}
+
+{\centering \includegraphics[width=6.5in,height=3.5in]{\VAR{plots_directory}seats-voteshares-ensemble-enacted-\VAR{chamber}-\VAR{plan}-PRES20.pdf} \par}
+{\centering \includegraphics[width=5.8154in,height=3.1311in]{\VAR{plots_directory}mean-median-partisan-bias-ensemble-enacted-\VAR{chamber}-\VAR{plan}-PRES20.pdf} \par}
+{\centering \includegraphics[width=4.6909in,height=3.3752in]{\VAR{plots_directory}partisan-metrics-2D-\VAR{chamber}-\VAR{plan}-PRES20.pdf} \par}
+
+{\centering \includegraphics[width=6.5in,height=3.5in]{\VAR{plots_directory}seats-voteshares-ensemble-enacted-\VAR{chamber}-\VAR{plan}-SEN20.pdf} \par}
+{\centering \includegraphics[width=5.8154in,height=3.1311in]{\VAR{plots_directory}mean-median-partisan-bias-ensemble-enacted-\VAR{chamber}-\VAR{plan}-SEN20.pdf} \par}
+{\centering \includegraphics[width=4.6909in,height=3.3752in]{\VAR{plots_directory}partisan-metrics-2D-\VAR{chamber}-\VAR{plan}-SEN20.pdf} \par}
+
+{\centering \includegraphics[width=6.5in,height=3.5in]{\VAR{plots_directory}violin-plot-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-BVAP.pdf} \par}
+{\centering \includegraphics[width=6.5in,height=3.5in]{\VAR{plots_directory}violin-plot-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-HVAP.pdf} \par}
+{\centering \includegraphics[width=6.5in,height=3.5in]{\VAR{plots_directory}violin-plot-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-BHVAP.pdf} \par}
+{\centering \includegraphics[width=6.5in,height=3.5in]{\VAR{plots_directory}violin-plot-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-NWVAP.pdf} \par}
+
+\begin{figure*}[h]
+\includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-BVAP-0.3.pdf}
+\includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-BVAP-0.4.pdf}
+\end{figure*}
+\begin{figure*}[h]
+\includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-BVAP-0.5.pdf}
+\end{figure*}
+
+\begin{figure*}[h]
+\includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-HVAP-0.5.pdf}
+\includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-HVAP-0.55.pdf}
+\end{figure*}
+\begin{figure*}[h]
+\includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-HVAP-0.6.pdf}
+\includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-HVAP-0.65.pdf}
+\end{figure*}
+
+\begin{figure*}[h]
+\includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-BHVAP-0.5.pdf}
+\includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-BHVAP-0.6.pdf}
+\end{figure*}
+\begin{figure*}[h]
+\includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-BHVAP-0.7.pdf}
+\end{figure*}
+
+\begin{figure*}[h]
+\includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-NWVAP-0.5.pdf}
+\includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-NWVAP-0.6.pdf}
+\end{figure*}
+\begin{figure*}[h]
+\includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-NWVAP-0.7.pdf}
+\end{figure*}
+
+\begin{figure*}[h]{\centering \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}racial-political-deviations-\VAR{chamber}-\VAR{plan}-PRES20-BVAP.pdf} \par}\end{figure*}
+\begin{figure*}[h]{\centering \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}racial-political-deviations-\VAR{chamber}-\VAR{plan}-PRES20-HVAP.pdf} \par}\end{figure*}
+\begin{figure*}[h]{\centering \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}racial-political-deviations-\VAR{chamber}-\VAR{plan}-PRES20-BHVAP.pdf} \par}\end{figure*}
+\begin{figure*}[h]{\centering \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}racial-political-deviations-\VAR{chamber}-\VAR{plan}-PRES20-NWVAP.pdf} \par}\end{figure*}
+
+\begin{figure*}[h]{\centering \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}racial-political-deviations-\VAR{chamber}-\VAR{plan}-SEN20-BVAP.pdf} \par}\end{figure*}
+\begin{figure*}[h]{\centering \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}racial-political-deviations-\VAR{chamber}-\VAR{plan}-SEN20-HVAP.pdf} \par}\end{figure*}
+\begin{figure*}[h]{\centering \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}racial-political-deviations-\VAR{chamber}-\VAR{plan}-SEN20-BHVAP.pdf} \par}\end{figure*}
+\begin{figure*}[h]{\centering \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}racial-political-deviations-\VAR{chamber}-\VAR{plan}-SEN20-NWVAP.pdf} \par}\end{figure*}
+\end{document}
