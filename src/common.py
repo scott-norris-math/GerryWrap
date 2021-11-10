@@ -296,6 +296,25 @@ def build_TXSN_random_seed_simulation_settings() -> Dict:
     return settings
 
 
+def build_USCD_random_seed_simulation_settings() -> Dict:
+    settings = Dict()
+    settings.dual_graph_filename = 'graph_TX_2020_cntyvtd_USCD_seed_0207.gpickle'
+    settings.epsilon = determine_population_limit('USCD')
+    return settings
+
+
+def build_report_directory_and_filename(chamber: str, directory: str, plan: int) -> tuple[str, str]:
+    reports_directory = build_reports_directory(directory)
+    report_filename_prefix = f'report_{encode_chamber_character(chamber)}{plan}'
+    report_directory = f'{reports_directory}{report_filename_prefix}/'
+    ensure_directory_exists(report_directory)
+    return report_directory, report_filename_prefix
+
+
+def build_reports_directory(directory: str) -> str:
+    return f'{directory}reports/'
+
+
 def ensure_directory_exists(output_directory: str) -> None:
     os.makedirs(output_directory, exist_ok=True)
 

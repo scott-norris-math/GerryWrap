@@ -983,7 +983,7 @@ def mean_median_distribution(ensemble: np.ndarray, instance: np.ndarray,
 
 
 def racial_vs_political_deviations(ensemble_p: np.ndarray, instance_p: np.ndarray, ensemble_r: np.ndarray,
-                                   instance_r: np.ndarray) -> Any:
+                                   instance_r: np.ndarray, title: str) -> Any:
     # get shape of data
     chainlength, districts = np.shape(ensemble_p)
     dist_list = np.arange(1, districts + 1)
@@ -1003,6 +1003,7 @@ def racial_vs_political_deviations(ensemble_p: np.ndarray, instance_p: np.ndarra
     pop_diffs_by_dist = [pop_diffs_by_rank[ii] for ii in np.argsort(sorted_districts_r)]
 
     fig, ax = plt.subplots(figsize=(10, 6))
+    fig.suptitle(title)
     ax.plot(pop_diffs_by_dist, vote_diffs_by_dist, 'bs')
     ax.plot([0, 0], [-.3, .3], 'k--')
     ax.plot([-.2, .4], [0, 0], 'k--')

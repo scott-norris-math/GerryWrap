@@ -69,8 +69,7 @@ def load_geodataframe(directory: str, redistricting_data_filename: str = None) -
 
         geodata = pd.concat([county_vtd_geodata, county_geodata]).drop_duplicates().set_index('geoid', drop=False)
     else:
-        node_data = pd.read_parquet(
-            f'{redistricting_data_directory}{redistricting_data_filename}')
+        node_data = pd.read_parquet(f'{redistricting_data_directory}{redistricting_data_filename}')
 
         node_data['geometry'] = node_data['polygon'].apply(wkt.loads)
         node_geodata = gpd.GeoDataFrame(node_data, geometry='geometry')
@@ -89,12 +88,12 @@ def fix_election_columns_text(df: pd.DataFrame) -> None:
         'President_2020_R_Trump_general': 'President_2020_general_R_Trump'}, inplace=True)
 
 
-def load_graph_with_geometry(directory: str, dual_graph_filename: str, geodata: gpd.GeoDataFrame) -> Graph:
+def load_graph_with_geometry(directory: str, dual_graph_filename: str, geodata: gpd.GeoDataFrame,
+                             columns: Optional[list[str]] = ['geometry']) -> Graph:
     seeds_directory = cm.build_seeds_directory(directory)
     dual_graph = nx.read_gpickle(seeds_directory + dual_graph_filename)
-
     graph = Graph(dual_graph, geometry=geodata)
-    graph.join(geodata, columns=['geometry'], right_index='geoid')
+    graph.join(geodata, columns=columns, right_index='geoid')
 
     # TODO: this may be unnecessary - check
     filtered_df = geodata[geodata['geoid'].isin(graph.nodes().keys())]
@@ -102,6 +101,14 @@ def load_graph_with_geometry(directory: str, dual_graph_filename: str, geodata: 
     graph.geometry.index = filtered_df.geoid
 
     return graph
+
+
+def load_geographic_partition(chamber:str, directory: str, plan: int,
+                              columns: Optional[list[str]] = ['geometry']) -> GeographicPartition:
+    settings = cm.build_proposed_plan_simulation_settings(chamber, plan)
+    geodata = load_geodataframe(directory, settings.redistricting_data_filename)
+    graph = load_graph_with_geometry(directory, settings.dual_graph_filename, geodata, columns)
+    return GeographicPartition(graph, 'district', updaters=[])
 
 
 def join_data_to_dual_graph(graph: Graph, data: pd.DataFrame) -> None:
@@ -660,8 +667,8 @@ def calculate_size(canonical_plans: Iterable[frozenset[frozenset]]) -> int:
 
 
 if __name__ == '__main__':
-    def main():
-        directory = 'C:/Users/rob/projects/election/rob/'
+    def main() -> None:
+        directory = 'G:/rob/projects/election/rob/'
 
         if False:
             canonical_plans = set()

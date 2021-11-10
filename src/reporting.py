@@ -27,19 +27,16 @@ def compile_pdf(directory: str, tex_filename: str, output_filename_prefix: str) 
 def save_report(chamber: str, directory: str, j2_template: jinja2.Template, plan: int) -> None:
     seed_description, ensemble_number = cm.get_current_ensemble(chamber)
     ensemble_description = cm.build_ensemble_description(chamber, seed_description, ensemble_number)
+    report_directory, report_filename_prefix = cm.build_report_directory_and_filename(chamber, directory, plan)
     data = {
         'chamber': chamber,
         'plan': plan,
         'plan_name': cm.build_plan_name(chamber, plan),
         'original_plan': str(cm.determine_original_plan(chamber)),
         'number_plans': determine_number_plans(chamber),
-        'plots_directory': pl.build_plots_directory(directory, ensemble_description)
+        'plots_directory': pl.build_plots_directory(directory, ensemble_description),
+        'report_directory': report_directory
     }
-
-    reports_directory = build_reports_directory(directory)
-    report_filename_prefix = f'report_{cm.encode_chamber_character(chamber)}{plan}'
-    report_directory = f'{reports_directory}{report_filename_prefix}/'
-    cm.ensure_directory_exists(report_directory)
 
     rendered_tex = j2_template.render(data)
     rendered_tex_filename = f'{report_filename_prefix}.tex'
@@ -50,16 +47,11 @@ def save_report(chamber: str, directory: str, j2_template: jinja2.Template, plan
     compile_pdf(report_directory, rendered_tex_filename, report_filename_prefix)
 
 
-def build_reports_directory(directory: str) -> str:
-    reports_directory = f'{directory}reports/'
-    return reports_directory
-
-
 if __name__ == '__main__':
-    def main():
-        directory = 'C:/Users/rob/projects/election/rob/'
+    def main() -> None:
+        directory = 'G:/rob/projects/election/rob/'
 
-        reports_directory = build_reports_directory(directory)
+        reports_directory = cm.build_reports_directory(directory)
         template_directory = f'{reports_directory}template/'
 
         latex_jinja_env = jinja2.Environment(
@@ -78,13 +70,14 @@ if __name__ == '__main__':
 
         j2_template = latex_jinja_env.get_template('Stmt-on-template.tex')
 
-        for chamber in cm.CHAMBERS:
+        for chamber in cm.CHAMBERS:  # ['TXSN']:  # , 'USCD'
             print(f"Chamber: {chamber}")
 
-            plans = sorted(list(pp.get_valid_plans(chamber, pp.build_plans_directory(directory)) - {2100}))
+            plans = sorted(list(pp.get_valid_plans(chamber, pp.build_plans_directory(directory)) - {2100}), reverse=True)
             for plan in plans:
                 print(f"Plan: {plan}")
                 save_report(chamber, directory, j2_template, plan)
+                # break
 
 
     main()

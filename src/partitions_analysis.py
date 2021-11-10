@@ -326,8 +326,8 @@ def plot_beta(data: Iterable[float]) -> None:
 
 
 if __name__ == '__main__':
-    def main():
-        directory = 'C:/Users/rob/projects/election/rob/'
+    def main() -> None:
+        directory = 'G:/rob/projects/election/rob/'
 
         if True:
             ensemble_description = 'TXSN_random_seed_2'

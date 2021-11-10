@@ -1,5 +1,5 @@
 from os import listdir
-from os.path import isfile
+from os.path import isfile, exists
 from collections import defaultdict
 import pandas as pd
 from typing import Callable, Iterable
@@ -63,6 +63,14 @@ def hisp_percent(df: pd.DataFrame) -> pd.Series:
     return df['o17_hisp_pop'] / df['o17_pop']
 
 
+def white_percent(df: pd.DataFrame) -> pd.Series:
+    return df['o17_nonhisp_white'] / df['o17_pop']
+
+
+def non_white_percent(df: pd.DataFrame) -> pd.Series:
+    return 1 - white_percent(df)
+
+
 def black_sum_percent(df: pd.DataFrame) -> pd.Series:
     race_sum = black_sum(df)
     return race_sum / df['o17_pop']
@@ -112,7 +120,9 @@ def transform_racial_group_file_prefix(racial_group: str) -> str:
     return {
         'HVAP': "hisp",
         'BVAP': "black",
-        'BHVAP': "black_hisp"
+        'BHVAP': "black_hisp",
+        'WVAP': "white",
+        'NWVAP': "non_white"
     }[racial_group]
 
 
@@ -137,9 +147,12 @@ def build_statistics_settings() -> list[tuple[str, Callable[[pd.DataFrame], pd.S
         (build_race_filename_prefix('hisp'), hisp_percent),
         (build_race_filename_prefix('black_hisp'), black_hisp_percent),
         (build_race_filename_prefix('black'), black_percent),
+        (build_race_filename_prefix('white'), white_percent),
+        (build_race_filename_prefix('non_white'), non_white_percent),
         (build_election_filename_prefix('PRES20'), pres20_percent),
         (build_election_filename_prefix('SEN20'), sen20_percent),
-        ('total_o17_pop', o17_pop)
+        ('o17_pop', o17_pop),
+        ('total_pop', total_pop)
     ]
 
 
@@ -152,9 +165,16 @@ def build_canonical_assignments_list(assignments: list[tuple[int, int]]) -> list
     return partition_list
 
 
-def load_filtered_redistricting_data(directory: str, redistricting_data_filename: str) -> pd.DataFrame:
+def load_filtered_redistricting_data(directory: str, redistricting_data_filename: str,
+                                     additional_columns: list[str] = []) -> pd.DataFrame:
     redistricting_data_directory = pp.build_redistricting_data_directory(directory)
-    node_data = pd.read_parquet(f'{redistricting_data_directory}{redistricting_data_filename}')
+    redistricting_data_path = f'{redistricting_data_directory}{redistricting_data_filename}'
+    if redistricting_data_path.endswith('.parquet'):
+        node_data = pd.read_parquet(redistricting_data_path)
+    elif redistricting_data_path.endswith('.csv'):
+        node_data = pd.read_csv(redistricting_data_path)
+    else:
+        raise RuntimeError('Unknown file extension')
 
     # redistricting data stored at the census block level has some different column names
     si.fix_election_columns_text(node_data)
@@ -165,9 +185,11 @@ def load_filtered_redistricting_data(directory: str, redistricting_data_filename
         'geoid',
         'President_2020_general_D_Biden', 'President_2020_general_R_Trump',
         'USSen_2020_general_D_Hegar', 'USSen_2020_general_R_Cornyn',
-        'o17_hisp_pop', 'black_o17_sum', 'black_hisp_o17_sum', 'o17_pop'
-    ])
+        'o17_hisp_pop', 'black_o17_sum', 'black_hisp_o17_sum', 'o17_pop',
+        'o17_nonhisp_white', 'total_pop'
+    ] + additional_columns)
     filtered_node_data.set_index('geoid', drop=False, inplace=True)
+    filtered_node_data.sort_index(inplace=True)
     return filtered_node_data
 
 
@@ -185,12 +207,22 @@ def combine_and_fix_redistricting_data_file(directory: str) -> None:
 
 
 def save_ensemble_matrices(chamber: str, directory: str, redistricting_data_filename: str, graph: nx.Graph,
-                           ensemble_description: str) -> None:
+                           ensemble_description: str, file_numbers: Iterable[int]) -> None:
     node_data = load_filtered_redistricting_data(directory, redistricting_data_filename)
-    with Timer(name='load_plans'):
-        plans = cm.load_plans(directory, ensemble_description, 0)
+    plans = cm.load_plans_from_files(directory, ensemble_description, file_numbers)
 
     statistics_settings = build_statistics_settings()
+    ensemble_directory = cm.build_ensemble_directory(directory, ensemble_description)
+    statistics_paths = {x: f'{ensemble_directory}{x}.npz' for x, _ in statistics_settings}
+    statistics_settings = [(x, y) for x, y in statistics_settings if not exists(statistics_paths[x])]
+    if len(statistics_settings) == 0:
+        print("All ensemble matrices already exist")
+        return
+
+    print("Saving ensemble matrices for: ")
+    for statistic, _ in statistics_settings:
+        print(statistic)
+
     number_districts = cm.get_number_districts(chamber)
     ensemble_matrices = {statistic: np.zeros((len(plans), number_districts)) for statistic, _ in
                          statistics_settings}
@@ -220,10 +252,9 @@ def save_ensemble_matrices(chamber: str, directory: str, redistricting_data_file
             statistic_series = statistic_func(district_data)
             ensemble_matrices[statistic][current_plan] = statistic_series.to_numpy()
 
-    ensemble_directory = cm.build_ensemble_directory(directory, ensemble_description)
     for statistic, ensemble_matrix in ensemble_matrices.items():
-        print(f"Saving {statistic}")
-        np.savez_compressed(f'{ensemble_directory}{statistic}.npz', ensemble_matrix)
+        print(f"Saving: {statistic}")
+        np.savez_compressed(statistics_paths[statistic], ensemble_matrix)
 
 
 def save_unique_plans(ensemble_directory, plans: np.ndarray) -> None:
@@ -232,42 +263,31 @@ def save_unique_plans(ensemble_directory, plans: np.ndarray) -> None:
     np.savez_compressed(f'{ensemble_directory}/unique_plans.npz', np.array(unique_plans))
 
 
-def verify_ensemble_matrices_creation(directory: str) -> None:
-    ensemble_description = 'TXSN_random_seed_test_2'
-    statistics_settings = [(x, y) for x, y in build_statistics_settings() if x != 'total_o17_pop']
+def compare_statistics(matrix_1, matrix_2, sort) -> None:
+    if sort:
+        matrix_1.sort(axis=1)
+        matrix_2.sort(axis=1)
+    print(np.shape(matrix_1))
+    print(np.shape(matrix_2))
+    if not np.allclose(matrix_1, matrix_2):
+        print(matrix_1[0])
+        print(matrix_2[0])
+        print(f"different arrays")
 
-    subset_size = 100000
-    old_ensemble_directory = f"{cm.build_ensemble_directory(directory, ensemble_description)}original/"
-    old_ensemble_matrices = {
-        statistic: cm.load_ensemble_matrix_sorted_transposed(
-            old_ensemble_directory, statistic)[:, 0:subset_size].transpose()
-        for statistic, _ in statistics_settings}
 
-    ensemble_directory = cm.build_ensemble_directory(directory, ensemble_description)
-    new_ensemble_matrices = {
-        statistic: cm.load_ensemble_matrix_sorted_transposed(ensemble_directory, statistic).transpose()
-        for statistic, _ in statistics_settings}
-
-    for statistic, _ in statistics_settings:
-        old_ensemble_matrix = old_ensemble_matrices[statistic]
-        new_ensemble_matrix = new_ensemble_matrices[statistic]
-
-        print(f"{statistic} {np.shape(old_ensemble_matrix)} {np.shape(new_ensemble_matrix)}")
-
-        for old_row, new_row in zip(old_ensemble_matrix, new_ensemble_matrix):
-            if any((old_row - new_row) != 0):
-                error_message = f"Rows do not agree - Old: {old_row} New: {new_row}"
-                raise RuntimeError(error_message)
+def convert_to_csv(ensemble_directory, filename_prefix):
+    array = cm.load_numpy_compressed(f'{ensemble_directory}{filename_prefix}.npz')
+    cm.save_numpy_csv(f'{ensemble_directory}{filename_prefix}.csv', array)
 
 
 if __name__ == '__main__':
-    def main():
+    def main() -> None:
         print('start')
 
         t = Timer()
         t.start()
 
-        directory = 'C:/Users/rob/projects/election/rob/'
+        directory = 'G:/rob/projects/election/rob/'
 
         if False:
             combine_and_fix_redistricting_data_file(directory)
@@ -278,18 +298,36 @@ if __name__ == '__main__':
             ensemble_directory = cm.build_ensemble_directory(directory, ensemble_description)
             save_unique_plans(ensemble_directory, plans)
 
-        if False:
-            settings = cm.build_TXSN_random_seed_simulation_settings()
+        if True:
+            chamber = 'TXHD'  # 'TXSN'  # 'USCD' #
+            plan = 2176
+            settings = cm.build_proposed_plan_simulation_settings(chamber, plan) # cm.build_TXSN_random_seed_simulation_settings()  # cm.build_USCD_random_seed_simulation_settings()  #
 
             seeds_directory = cm.build_seeds_directory(directory)
             dual_graph = nx.read_gpickle(seeds_directory + settings.dual_graph_filename)
 
-            ensemble_description = 'TXSN_random_seed_test_2'
-            save_ensemble_matrices('TXSN', directory, 'nodes_TX_2020_cnty_cntyvtd_sldu.parquet', dual_graph,
-                                   ensemble_description)
+            ensemble_description = f'{chamber}_{plan}_product_1' # f'{chamber}_random_seed_2' #
+            ensemble_directory = cm.build_ensemble_directory(directory, ensemble_description)
+
+            convert_to_csv(ensemble_directory, 'total_pop')
+            convert_to_csv(ensemble_directory, 'o17_pop')
+
+            # save_ensemble_matrices(chamber, directory, 'nodes_TX_2020_cnty_cntyvtd_sldu.parquet', dual_graph,  # nodes_TX_2020_cntyvtd_cd.csv
+            #                        ensemble_description, range(0, 7))  # 15)) #
 
         if False:
-            verify_ensemble_matrices_creation(directory)
+            chamber = 'USCD'
+            ensemble_description_1 = f'{chamber}_random_seed_2'
+            ensemble_description_2 = f'{chamber}_random_seed_2Copy'
+            ensemble_directory_1 = cm.build_ensemble_directory(directory, ensemble_description_1)
+            ensemble_directory_2 = cm.build_ensemble_directory(directory, ensemble_description_2)
+            sort = True
+            for statistic, _ in build_statistics_settings():
+                print(statistic)
+                statistics_path_1 = f'{ensemble_directory_1}{statistic}.npz'
+                statistics_path_2 = f'{ensemble_directory_2}{statistic}.npz'
+                compare_statistics(cm.load_numpy_compressed(statistics_path_1),
+                                   cm.load_numpy_compressed(statistics_path_2), sort)
 
         if False:
             chamber = 'TXSN'  # 'USCD'  #

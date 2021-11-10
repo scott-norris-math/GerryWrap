@@ -1,7 +1,7 @@
 import networkx as nx
 import networkx.algorithms.bipartite.matching as ma
 import numpy as np
-from typing import Callable, Iterable, Any
+from typing import Callable, Iterable, Any, Optional
 from itertools import chain, product
 import pandas as pd
 import random
@@ -105,21 +105,17 @@ def build_node_data(data: pd.DataFrame, geographic_unit: str) -> pd.DataFrame:
     return node_data
 
 
-def build_seeds_working_directory(directory: str) -> str:
-    return f'{cm.build_seeds_directory(directory)}working/'
-
-
-def build_node_data_path(seeds_working_directory: str, seed_filename_prefix: str) -> str:
-    return f'{seeds_working_directory}{seed_filename_prefix}.parquet'
+def build_node_data_path(seeds_directory: str, seed_filename_prefix: str) -> str:
+    return f'{seeds_directory}nodes_{seed_filename_prefix}.parquet'
 
 
 def save_node_data(directory: str, seed_filename_prefix: str, node_data: pd.DataFrame) -> None:
-    seeds_working_directory = build_seeds_working_directory(directory)
+    redistricting_data_directory = pp.build_redistricting_data_directory(directory)
 
     node_data['polygon'] = [x.wkt for x in node_data['polygon']]
-    node_data_path = build_node_data_path(seeds_working_directory, seed_filename_prefix)
+    node_data_path = build_node_data_path(redistricting_data_directory, seed_filename_prefix)
     node_data.to_parquet(node_data_path, index=False)
-    # node_data.to_csv(f'{seeds_working_directory}{stem}.csv', index=False, quoting=csv.QUOTE_ALL)
+    # node_data.to_csv(f'{redistricting_data_directory}{stem}.csv', index=False, quoting=csv.QUOTE_ALL)
 
 
 def build_seed_filename_prefix(chamber: str, geographic_unit: str, suffix: int) -> str:
@@ -134,8 +130,7 @@ def save_2010_node_data(chamber: str, directory: str, geographic_unit: str) -> N
     save_node_data(directory, seed_filename_prefix, node_data)
 
 
-def save_plan_node_data(chamber: str, directory: str, geographic_unit: str, plan: int) -> None:
-    data = load_redistricting_data(directory)
+def save_plan_node_data(chamber: str, directory: str, geographic_unit: str, plan: int, data: pd.DataFrame) -> None:
     plan_geoid_column = 'SCTBKEY'
     plan_district_column = 'DISTRICT'
     data = assign_plan_districts(chamber, directory, data, plan, plan_geoid_column, plan_district_column)
@@ -145,8 +140,8 @@ def save_plan_node_data(chamber: str, directory: str, geographic_unit: str, plan
 
 
 def load_node_data(directory: str, seed_filename_prefix: str) -> pd.DataFrame:
-    seeds_working_directory = build_seeds_working_directory(directory)
-    node_data_path = build_node_data_path(seeds_working_directory, seed_filename_prefix)
+    redistricting_data_directory = pp.build_redistricting_data_directory(directory)
+    node_data_path = build_node_data_path(redistricting_data_directory, seed_filename_prefix)
     node_data = pd.read_parquet(node_data_path)
     node_data['polygon'] = node_data['polygon'].apply(sh.wkt.loads)
     node_data.set_index('geoid', drop=False, inplace=True)
@@ -160,7 +155,7 @@ def build_dual_graph(chamber: str, node_data: pd.DataFrame) -> nx.Graph:
                       for x_geoid, x_polygon in zip(node_data['geoid'], node_data['polygon'])
                       for y_geoid, y_polygon in zip(node_data['geoid'], node_data['polygon']) if x_geoid < y_geoid):
         if i % 1000000 == 0:
-            print("Determining Intersections: {i}")
+            print(f"Determining Intersections: {i}")
 
         if x_polygon.intersects(y_polygon):
             intersection = x_polygon.intersection(y_polygon)
@@ -277,8 +272,8 @@ def remove_isolated_county_edges(dual_graph: nx.Graph, county_district_graph: nx
 def save_reduced_dual_graph(directory: str, reduced_graph_filename_prefix: str, dual_graph: nx.Graph,
                             county_district_graph: nx.Graph, minimum_whole_counties: int):
     remove_isolated_county_edges(dual_graph, county_district_graph, minimum_whole_counties)
-    seeds_working_directory = build_seeds_working_directory(directory)
-    nx.write_gpickle(dual_graph, f'{seeds_working_directory}{reduced_graph_filename_prefix}.gpickle')
+    seeds_directory = cm.build_seeds_directory(directory)
+    nx.write_gpickle(dual_graph, f'{seeds_directory}{reduced_graph_filename_prefix}.gpickle')
 
 
 def build_region_plans_path(ensemble_directory: str, region: str) -> str:
@@ -366,7 +361,7 @@ def save_unique_region_plans(directory: str, ensemble_description: str, dual_gra
 
 
 def save_region_product_ensemble(chamber: str, reduced_ensemble_directory: str, product_ensemble_directory: str,
-                                 dual_graph: nx.Graph, county_district_graph: nx.Graph) -> None:
+                                 dual_graph: nx.Graph, county_district_graph: nx.Graph, number_plans: int) -> None:
     whole_targets, intersect_targets = si.extract_defect_targets(county_district_graph)
     counties = si.extract_counties(county_district_graph)
 
@@ -383,7 +378,6 @@ def save_region_product_ensemble(chamber: str, reduced_ensemble_directory: str, 
     verify = False
     number_districts = cm.get_number_districts(chamber)
     plan_hashes = set()
-    number_plans = 1000000  # 100 #
     current_plan = 0
     number_collisions = 0
     plans = np.zeros((number_plans, max_index + 1), dtype='uint8')
@@ -393,7 +387,7 @@ def save_region_product_ensemble(chamber: str, reduced_ensemble_directory: str, 
             print(f"{datetime.now().strftime('%H:%M:%S')} {current_plan} Number Collisions: {number_collisions}")
 
         for region, region_indices in region_indices_lookup.items():
-            region_plan = random.choice(region_plans_lookup[region])
+            region_plan: np.ndarray = random.choice(region_plans_lookup[region])
             plans[current_plan, region_indices] = region_plan
 
         plan_hash = cm.calculate_plan_hash(plans[current_plan])
@@ -415,26 +409,62 @@ def save_region_product_ensemble(chamber: str, reduced_ensemble_directory: str, 
     np.savez_compressed(f'{product_ensemble_directory}/plans_0.npz', np.array(plans))
 
 
+def save_seed(chamber: str, directory: str, geographic_unit: str, plan: Optional[int],
+              redistricting_data: Optional[pd.DataFrame] = None) -> None:
+    create_2010_seed = plan is None
+    if create_2010_seed:
+        save_2010_node_data(chamber, directory, geographic_unit)
+        seed_filename_prefix = build_seed_filename_prefix(chamber, geographic_unit, 2010)
+    else:
+        assert isinstance(plan, int)
+        redistricting_data = load_redistricting_data(directory) if redistricting_data is None else redistricting_data
+        assert isinstance(redistricting_data, pd.DataFrame)
+        save_plan_node_data(chamber, directory, geographic_unit, plan, redistricting_data)
+        seed_filename_prefix = build_seed_filename_prefix(chamber, geographic_unit, plan)
+
+    node_data = load_node_data(directory, seed_filename_prefix)
+    dual_graph = build_dual_graph(chamber, node_data)
+
+    if create_2010_seed and chamber == 'USCD':
+        add_new_districts(dual_graph, 36, 2, node_data)
+
+    seeds_directory = cm.build_seeds_directory(directory)
+
+    dual_graph_path_prefix = f'{seeds_directory}graph_{seed_filename_prefix}'
+    nx.write_gpickle(dual_graph, dual_graph_path_prefix + '.gpickle')
+    save_graph_compressed_json(dual_graph, dual_graph_path_prefix + '.json.gz')
+
+    county_district_graph = build_country_district_graph(chamber, dual_graph)
+
+    county_district_graph_path_prefix = f'{seeds_directory}adj_{seed_filename_prefix}'
+    nx.write_gpickle(county_district_graph, county_district_graph_path_prefix + '.gpickle')
+    save_graph_compressed_json(county_district_graph, county_district_graph_path_prefix + '.json.gz')
+
+
 if __name__ == '__main__':
-    def main():
-        directory = 'C:/Users/rob/projects/election/rob/'
+    def main() -> None:
+        directory = 'G:/rob/projects/election/rob/'
 
         chamber = 'TXHD'
         plan = 2176
         settings = cm.build_proposed_plan_simulation_settings(chamber, plan)
 
         seeds_directory = cm.build_seeds_directory(directory)
-        dual_graph = nx.read_gpickle(seeds_directory + settings.dual_graph_filename)
+        dual_graph = nx.read_gpickle(seeds_directory + 'graph_TX_2020_cntyvtd_TXHD_2176_Reduced.gpickle')  # settings.dual_graph_filename)
         county_district_graph = si.load_county_district_graph(directory, settings.country_district_graph_filename)
 
         minimum_whole_counties = 4
         reduced_ensemble_description = 'TXHD_2176_Reduced_3'
 
-        product_ensemble_description = f'{chamber}_{plan}_product_2'
+        product_ensemble_description = f'{chamber}_{plan}_product_1'
         product_ensemble_directory = cm.build_ensemble_directory(directory, product_ensemble_description)
         cm.ensure_directory_exists(product_ensemble_directory)
 
-        if True:
+        if False:
+            data = load_redistricting_data(directory)
+            cm.save_all_text("\n".join(data.columns), f'{directory}availableColumns.csv')
+
+        if False:
             # Build the reduced graph without edges between isolated counties to speed up the simulation
             reduced_graph_filename_prefix = settings.dual_graph_filename.replace('.gpickle', '_Reduced')
             save_reduced_dual_graph(directory, reduced_graph_filename_prefix, dual_graph, county_district_graph,
@@ -453,7 +483,7 @@ if __name__ == '__main__':
             # Randomly join together regional plans to form product plans
             reduced_ensemble_directory = cm.build_ensemble_directory(directory, reduced_ensemble_description)
             save_region_product_ensemble(chamber, reduced_ensemble_directory, product_ensemble_directory, dual_graph,
-                                         county_district_graph)
+                                         county_district_graph, 1000000)
 
         if False:
             with Timer(name='load_plans'):
@@ -465,45 +495,19 @@ if __name__ == '__main__':
             np.savez_compressed(f'{product_ensemble_directory}defects.npz', np.array(defects))
 
         if True:
-            # Build the desired ensemble matrices by joining product plans to data
             dt.save_ensemble_matrices(chamber, directory, settings.redistricting_data_filename, dual_graph,
-                                      product_ensemble_description)
+                                      product_ensemble_description, [0])
 
         if False:
-            # Code for generating a seed from 2010 districts or from a plan file
-            cm.ensure_directory_exists(build_seeds_working_directory(directory))
-
-            chamber = 'TXHD'
             geographic_unit = 'cntyvtd'
 
-            create_plan_graph = False
-            if create_plan_graph:
-                plan = 2176
-                save_plan_node_data(chamber, directory, geographic_unit, plan)
-                seed_filename_prefix = build_seed_filename_prefix(chamber, geographic_unit, plan)
-            else:
-                save_2010_node_data(chamber, directory, geographic_unit)
-                seed_filename_prefix = build_seed_filename_prefix(chamber, geographic_unit, 2010)
+            redistricting_data = load_redistricting_data(directory)
 
-            node_data = load_node_data(directory, seed_filename_prefix)
-            dual_graph = build_dual_graph(chamber, node_data)
-
-            if not create_plan_graph and chamber == 'USCD':
-                add_new_districts(dual_graph, 36, 2, node_data)
-
-            seeds_working_directory = build_seeds_working_directory(directory)
-
-            dual_graph_path_prefix = f'{seeds_working_directory}graph_{seed_filename_prefix}'
-            nx.write_gpickle(dual_graph, dual_graph_path_prefix + '.gpickle')
-            save_graph_compressed_json(dual_graph, dual_graph_path_prefix + '.json.gz')
-
-            county_district_graph = build_country_district_graph(chamber, dual_graph)
-
-            county_district_graph_path_prefix = f'{seeds_working_directory}adj_{seed_filename_prefix}'
-            nx.write_gpickle(county_district_graph, county_district_graph_path_prefix + '.gpickle')
-            save_graph_compressed_json(county_district_graph, county_district_graph_path_prefix + '.json.gz')
+            for chamber in cm.CHAMBERS:
+                print(chamber)
+                for plan in pp.get_valid_plans(chamber, pp.build_plans_directory(directory)) - {2100}:
+                    print(plan)
+                    save_seed(chamber, directory, geographic_unit, plan, redistricting_data)
 
 
     main()
-
-# TODO Translate graph making code

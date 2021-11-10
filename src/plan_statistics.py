@@ -1,8 +1,9 @@
 import os
 import numpy as np
+import pandas as pd
 import scipy.stats as stats
 from addict import Dict
-from typing import Callable, Iterable
+from typing import Callable, Iterable, Optional
 
 import common as cm
 import data_transform as dt
@@ -286,12 +287,26 @@ def build_plan_name_cell_html(chamber: str, plan: int) -> str:
         ('USCD', 2135): 'B734C5E60A8C4202B83B007B15325E23'
     }
 
+    report_url_prefix = 'https://storage.googleapis.com/mum_project/reports/report_'  # S2125.pdf'
+
     plan_name = cm.build_plan_name(chamber, plan)
     media_anchor_id = media_anchor_map.get((chamber, plan))
-    return plan_name if media_anchor_id is None else f'<a href="-/media/{media_anchor_id}.ashx">{plan_name}</a>'
+    return f'<a href="{report_url_prefix}{plan_name}.pdf">{plan_name}</a>' \
+        if media_anchor_id is None else f'<a href="-/media/{media_anchor_id}.ashx">{plan_name}</a>'
 
 
-def build_row(chamber: str, number_ensemble_plans: int, plan_statistics: Dict) -> str:
+def build_submitter_string(parsed_submitter: tuple[Optional[str], str], submitter_party: Optional[str]):
+    s = f"{parsed_submitter[0]} " if parsed_submitter[0] is not None else ""
+    s = f"{s}{parsed_submitter[1]}"
+
+    if submitter_party is not None:
+        s = f"{s} ({submitter_party})"
+
+    return s
+
+
+def build_row(chamber: str, number_ensemble_plans: int, plan_statistics: Dict,
+              parsed_submitter: tuple[Optional[str], str], submitter_party: Optional[str]) -> str:
     def format_float(x: float) -> str:
         return format(x, '.2f').rstrip('0').rstrip('.')
 
@@ -304,13 +319,13 @@ def build_row(chamber: str, number_ensemble_plans: int, plan_statistics: Dict) -
     row_text = """
 <tr class="telerik-reTableFooterRow-2">
     <td class="telerik-reTableHeaderFirstCol-2" style="border:1px solid #4f81bd;   font-family: arial; font-size: 14pt;">{0}<br></td>
-    <td class="telerik-reTableHeaderFirstCol-2" style="border:1px solid #4f81bd;   font-family: arial; font-size: 14pt;"></td>
-    <td class="telerik-reTableHeaderFirstCol-2" style="border:1px solid #4f81bd;   font-family: arial; font-size: 14pt;">{1}<br></td>
-    <td class="telerik-reTableHeaderFirstCol-2" style="border:1px solid #4f81bd;   font-family: arial; font-size: 14pt;">{2}%<br></td>
-    <td class="telerik-reTableHeaderFirstCol-2" style="border:1px solid #4f81bd;   font-family: arial; font-size: 14pt;">{3}<br></td>
-    <td class="telerik-reTableHeaderFirstCol-2" style="border:1px solid #4f81bd;   font-family: arial; font-size: 14pt;">{4}%<br></td>
-    <td class="telerik-reTableHeaderFirstCol-2" style="border:1px solid #4f81bd;   font-family: arial; font-size: 14pt;">{5}</td>
+    <td class="telerik-reTableHeaderFirstCol-2" style="border:1px solid #4f81bd;   font-family: arial; font-size: 14pt;">{1}</td>
+    <td class="telerik-reTableHeaderFirstCol-2" style="border:1px solid #4f81bd;   font-family: arial; font-size: 14pt;">{2}<br></td>
+    <td class="telerik-reTableHeaderFirstCol-2" style="border:1px solid #4f81bd;   font-family: arial; font-size: 14pt;">{3}%<br></td>
+    <td class="telerik-reTableHeaderFirstCol-2" style="border:1px solid #4f81bd;   font-family: arial; font-size: 14pt;">{4}<br></td>
+    <td class="telerik-reTableHeaderFirstCol-2" style="border:1px solid #4f81bd;   font-family: arial; font-size: 14pt;">{5}%<br></td>
     <td class="telerik-reTableHeaderFirstCol-2" style="border:1px solid #4f81bd;   font-family: arial; font-size: 14pt;">{6}</td>
+    <td class="telerik-reTableHeaderFirstCol-2" style="border:1px solid #4f81bd;   font-family: arial; font-size: 14pt;">{7}</td>
 </tr>
 """
 
@@ -318,14 +333,16 @@ def build_row(chamber: str, number_ensemble_plans: int, plan_statistics: Dict) -
                                               number_ensemble_plans)
 
     return row_text.format(build_plan_name_cell_html(chamber, plan_statistics.plan),
+                           build_submitter_string(parsed_submitter, submitter_party),
                            format_float(plan_statistics.mm_plan), format_float(100 * (1 - plan_statistics.mm_portion)),
                            plan_statistics.pb_plan, format_float(plan_statistics.pb_percentile), plan_statistics.bias,
                            number_plans_str)
 
 
 def save_statistics_rows(chamber: str, directory: str, ensemble_statistics: dict[str, tuple[np.ndarray, np.ndarray]],
-                         file_prefix: str, plans: Iterable[int]) -> None:
+                         file_prefix: str, plans_metadata: pd.DataFrame) -> None:
     ensemble_mean_median, ensemble_partisan_bias = ensemble_statistics[chamber]
+    plans = [x.plan for x in plans_metadata.itertuples()]
     plan_vectors = cm.load_plan_vectors(chamber, directory, file_prefix, plans)
 
     ensemble_calculation, plan_statistics_list = calculate_statistics(chamber, ensemble_mean_median,
@@ -333,16 +350,23 @@ def save_statistics_rows(chamber: str, directory: str, ensemble_statistics: dict
     ensemble_statements = build_ensemble_statistics_statements(ensemble_calculation)
     print("\n".join(ensemble_statements))
 
+    party_lookup = pp.build_party_lookup(directory)
     rows = []
     for plan_statistics in plan_statistics_list:
-        rows.append(build_row(chamber, ensemble_calculation.number_ensemble_plans, plan_statistics))
+        plan = plan_statistics.plan
+        plan_metadata = plans_metadata.loc[plan]
+        parsed_submitter = pp.parse_submitter(plan_metadata.submitter)
+        submitter_party = pp.determine_party(party_lookup, parsed_submitter)
+        rows.append(build_row(chamber, ensemble_calculation.number_ensemble_plans, plan_statistics,
+                              parsed_submitter, submitter_party))
 
+    cm.save_all_text("\n".join(rows[0:6]), f'{directory}statistics_rows_{chamber}_short.txt')
     cm.save_all_text("\n".join(rows), f'{directory}statistics_rows_{chamber}.txt')
 
 
 if __name__ == '__main__':
-    def main():
-        directory = 'C:/Users/rob/projects/election/rob/'
+    def main() -> None:
+        directory = 'G:/rob/projects/election/rob/'
 
         if True:
             file_prefix = dt.build_election_filename_prefix('PRES20')
@@ -351,16 +375,16 @@ if __name__ == '__main__':
                                    chamber in admissible_chambers}
 
             for chamber in admissible_chambers:
-                plans_metadata_df = pp.load_plans_metadata(chamber, pp.build_plans_directory(directory))
-                valid_proposed_plans = sorted(list(pp.determine_valid_plans(plans_metadata_df)))
-                print(f"Chamber: {chamber} {len([x for x in valid_proposed_plans if x >= 2101])}")
+                plans_metadata = pp.load_plans_metadata(chamber, pp.build_plans_directory(directory))
+                valid_plans_metadata = plans_metadata[plans_metadata['invalid'] == False].copy()
+                valid_plans_metadata.set_index('plan', drop=False, inplace=True)
 
-                # save_statistics_statements(chamber, directory, ensemble_statistics, file_prefix,
-                #                           valid_proposed_plans)
+                print(f"Chamber: {chamber} {len([x for x in valid_plans_metadata.itertuples() if x.plan >= 2101])}")
 
-                valid_proposed_plans.reverse()
+                valid_plans_metadata.sort_index(ascending=False, inplace=True)
+
                 save_statistics_rows(chamber, directory, ensemble_statistics, file_prefix,
-                                     valid_proposed_plans)
+                                     valid_plans_metadata)
 
 
     main()

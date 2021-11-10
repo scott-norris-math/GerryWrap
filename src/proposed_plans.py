@@ -7,13 +7,15 @@ import networkx as nx
 import matplotlib.pyplot as plt
 import pylab
 from operator import itemgetter
+import numpy as np
 
 import common as cm
 import data_transform as dt
 from timer import Timer
 
 
-SCTB_COLUMN_NAME = 'SCTBKEY'
+SCTBKEY_COLUMN = 'SCTBKEY'
+DISTRICT_COLUMN = 'DISTRICT'
 
 
 def build_columns_path(chamber: str, directory: str) -> str:
@@ -74,7 +76,7 @@ def process_tabblock_data(chamber: str, directory: str) -> None:
 
 
 def load_block_equivalency_file(path: str) -> pd.DataFrame:
-    return pd.read_csv(path, dtype={SCTB_COLUMN_NAME: str, 'DISTRICT': int})
+    return pd.read_csv(path, dtype={SCTBKEY_COLUMN: str, DISTRICT_COLUMN: int})
 
 
 def build_plans_raw_directory(directory: str) -> str:
@@ -98,24 +100,24 @@ def build_plan_path(chamber: str, directory: str, plan: int) -> str:
 
 
 def normalize_block_equivalency_df(bef_df: pd.DataFrame) -> None:
-    if SCTB_COLUMN_NAME in bef_df.columns:
-        bef_df['geoid'] = [str(x)[2:] for x in bef_df[SCTB_COLUMN_NAME]]
-        bef_df.drop(columns=[SCTB_COLUMN_NAME], inplace=True)
+    if SCTBKEY_COLUMN in bef_df.columns:
+        bef_df['geoid'] = [str(x)[2:] for x in bef_df[SCTBKEY_COLUMN]]
+        bef_df.drop(columns=[SCTBKEY_COLUMN], inplace=True)
 
 
 def merge_block_equivalence_files(chamber: str, directory: str, source_plan: int, diff_plan: int) -> tuple[
     pd.DataFrame, int]:
     source_bef_df = load_block_equivalency_file(build_plan_path(chamber, directory, source_plan))
     diff_bef_df = load_block_equivalency_file(build_plan_raw_path(chamber, directory, diff_plan))
-    source_bef_df.set_index([SCTB_COLUMN_NAME], inplace=True)
-    diff_bef_df.set_index([SCTB_COLUMN_NAME], inplace=True)
-    joined_source_bef_df = source_bef_df.join(diff_bef_df, how='inner', on=SCTB_COLUMN_NAME, lsuffix='_source',
+    source_bef_df.set_index([SCTBKEY_COLUMN], inplace=True)
+    diff_bef_df.set_index([SCTBKEY_COLUMN], inplace=True)
+    joined_source_bef_df = source_bef_df.join(diff_bef_df, how='inner', on=SCTBKEY_COLUMN, lsuffix='_source',
                                               rsuffix='_diff')
-    joined_source_bef_df['DISTRICT'] = [x if y == 0 else y for x, y in
-                                        zip(joined_source_bef_df['DISTRICT_source'],
-                                            joined_source_bef_df['DISTRICT_diff'])]
+    joined_source_bef_df[DISTRICT_COLUMN] = [x if y == 0 else y for x, y in
+                                             zip(joined_source_bef_df['DISTRICT_source'],
+                                                 joined_source_bef_df['DISTRICT_diff'])]
     changed_rows = [not x == y for x, y in
-                    zip(joined_source_bef_df['DISTRICT'], joined_source_bef_df['DISTRICT_source'])]
+                    zip(joined_source_bef_df[DISTRICT_COLUMN], joined_source_bef_df['DISTRICT_source'])]
     number_changed_rows = sum(changed_rows)
     print(f"Merged: {source_plan} {diff_plan}  Changed Rows: {number_changed_rows}")
     joined_source_bef_df.drop(columns=['DISTRICT_source', 'DISTRICT_diff'], inplace=True)
@@ -125,15 +127,15 @@ def merge_block_equivalence_files(chamber: str, directory: str, source_plan: int
 def compare_block_equivalence_files(chamber: str, directory: str, source_plan: int, target_plan: int) -> int:
     source_bef_df = load_block_equivalency_file(build_plan_path(chamber, directory, source_plan))
     target_bef_df = load_block_equivalency_file(build_plan_path(chamber, directory, target_plan))
-    source_bef_df.set_index([SCTB_COLUMN_NAME], inplace=True)
-    target_bef_df.set_index([SCTB_COLUMN_NAME], inplace=True)
-    joined_source_bef_df = source_bef_df.join(target_bef_df, how='inner', on=SCTB_COLUMN_NAME, lsuffix='_source',
+    source_bef_df.set_index([SCTBKEY_COLUMN], inplace=True)
+    target_bef_df.set_index([SCTBKEY_COLUMN], inplace=True)
+    joined_source_bef_df = source_bef_df.join(target_bef_df, how='inner', on=SCTBKEY_COLUMN, lsuffix='_source',
                                               rsuffix='_target')
-    joined_source_bef_df['DISTRICT'] = [x if y == 0 else y for x, y in
-                                        zip(joined_source_bef_df['DISTRICT_source'],
-                                            joined_source_bef_df['DISTRICT_target'])]
+    joined_source_bef_df[DISTRICT_COLUMN] = [x if y == 0 else y for x, y in
+                                             zip(joined_source_bef_df['DISTRICT_source'],
+                                                 joined_source_bef_df['DISTRICT_target'])]
     changed_rows = [not x == y for x, y in
-                    zip(joined_source_bef_df['DISTRICT'], joined_source_bef_df['DISTRICT_source'])]
+                    zip(joined_source_bef_df[DISTRICT_COLUMN], joined_source_bef_df['DISTRICT_source'])]
 
     return sum(changed_rows)
 
@@ -145,6 +147,12 @@ def save_merged_plans(chamber: str, directory: str, source_plan: int, diff_plan:
 
     plans_metadata.at[diff_plan, 'changed_rows'] = number_changed_rows
     save_plans_metadata(chamber, build_plans_directory(directory), plans_metadata)
+
+
+def load_proposed_plan(chamber: str, directory: str, plan: int) -> np.ndarray:
+    bef_df = load_block_equivalency_file(build_plan_path(chamber, directory, plan))
+    bef_df.sort_values(by=SCTBKEY_COLUMN, inplace=True)
+    return bef_df[DISTRICT_COLUMN].to_numpy()
 
 
 def save_plan_data(chamber: str, directory: str, plan: int) -> None:
@@ -172,11 +180,11 @@ def save_plan_data(chamber: str, directory: str, plan: int) -> None:
 
     bq_chamber_name = dt.get_census_chamber_name(chamber)
     joined_df.drop(columns=['county', bq_chamber_name], inplace=True)
-    joined_df['DISTRICT'] = joined_df['DISTRICT'].astype(str)
-    grouped_by_district = joined_df.groupby('DISTRICT')
+    joined_df[DISTRICT_COLUMN] = joined_df[DISTRICT_COLUMN].astype(str)
+    grouped_by_district = joined_df.groupby(DISTRICT_COLUMN)
 
     plan_df = grouped_by_district.sum()
-    plan_df.sort_values('DISTRICT', ascending=True, inplace=True)
+    plan_df.sort_values(DISTRICT_COLUMN, ascending=True, inplace=True)
     print(f"{len(plan_df)}")
 
     plan_df.to_parquet(build_plan_data_path(chamber, directory, plan, 'parquet'))
@@ -220,9 +228,12 @@ def build_statistics_vector_settings() -> list[tuple[str, Callable[[pd.DataFrame
         (dt.build_race_filename_csv('hisp', 'vector'), dt.hisp_percent),
         (dt.build_race_filename_csv('black_hisp', 'vector'), dt.black_hisp_sum_percent),
         (dt.build_race_filename_csv('black', 'vector'), dt.black_sum_percent),
+        (dt.build_race_filename_csv('white', 'vector'), dt.white_percent),
+        (dt.build_race_filename_csv('non_white', 'vector'), dt.non_white_percent),
         (dt.build_election_filename_csv('PRES20', 'vector'), pres20_percent_vector),
         (dt.build_election_filename_csv('SEN20', 'vector'), sen20_percent_vector),
-        ('o17_pop_vector.csv', dt.o17_pop)
+        ('o17_pop_vector.csv', dt.o17_pop),
+        ('total_pop.csv', dt.total_pop)
     ]
 
 
@@ -241,7 +252,6 @@ def save_vector_file(chamber: str, df: pd.DataFrame, path: str,
 
     statistics_lookup = {x: y for x, y in zip(df['district'], statistic_func(df))}
     statistics_list = [statistics_lookup[str(x)] for x in range(1, max_district + 1)]
-    # print(f"Statistics: {len(statistics_list)} {statistics_list}")
 
     cm.save_vector_csv(path, statistics_list)
 
@@ -285,7 +295,7 @@ def save_current_merged_plans(chamber: str, directory: str, plans_metadata: pd.D
             print(f'Merging Plan: {plan}')
             if previous_plan == 0:
                 diff_bef_df = load_block_equivalency_file(build_plan_raw_path(chamber, directory, plan))
-                if any(diff_bef_df['DISTRICT'] == 0):
+                if any(diff_bef_df[DISTRICT_COLUMN] == 0):
                     print(f"INVALID PLAN {plan}")
                     plans_metadata.at[plan, 'invalid'] = 1
                     save_plans_metadata(chamber, build_plans_directory(directory), plans_metadata)
@@ -305,11 +315,11 @@ def save_current_plan_vectors(chamber: str, directory: str) -> None:
             continue
 
         plan = plan_metadata.plan
-        # TODO: check the existence of the vectors
         if not os.path.exists(build_plan_data_csv_path(directory, chamber, plan)):
-            print(f"Processing Plan Data/Vector: {plan}")
+            print(f"Processing Plan Data: {plan}")
             save_plan_data(chamber, directory, plan)
-            save_plan_vectors(chamber, directory, plan)
+
+        save_plan_vectors(chamber, directory, plan)
 
 
 def save_plan_vectors_summaries(chamber: str, directory: str) -> None:
@@ -364,45 +374,51 @@ def determine_valid_plans(plans_metadata_df: pd.DataFrame) -> set[int]:
     return {x.plan for x in plans_metadata_df.itertuples() if not x.invalid}
 
 
-def get_valid_plans(chamber, plans_directory) -> set[int]:
+def get_valid_plans(chamber: str, plans_directory: str) -> set[int]:
     return determine_valid_plans(load_plans_metadata(chamber, plans_directory))
 
 
 def update_plan_vectors(chamber: str, directory: str) -> None:
     save_current_plan_vectors(chamber, directory)
-    save_plan_vectors_summaries(chamber, directory)
+    if False:
+        save_plan_vectors_summaries(chamber, directory)
 
 
 def build_graph_path(chamber: str, directory: str) -> str:
     return f'{directory}plans_graph_{chamber}.png'
 
 
+def parse_submitter(submitter: str) -> tuple[Optional[str], str]:
+    elements = submitter.split(" ")
+    cleaned_title = elements[0].removesuffix(".")
+    if len(elements) == 2:
+        name = elements[1]
+    elif len(elements) == 3:
+        name = elements[1][0] + " " + elements[2]
+    else:
+        error = f"Unknown Name Format - {submitter}"
+        raise RuntimeError(error)
+
+    if cleaned_title in ["SEN", "REP"]:
+        return cleaned_title, name
+    else:
+        return None, submitter
+
+
+def determine_party(party_lookup: dict[str, dict[str, str]], submitter: tuple[Optional[str], str]) -> Optional[str]:
+    title = submitter[0]
+    last_name = submitter[1]
+    if title == 'SEN':
+        return party_lookup['TXSN'].get(last_name)
+    elif title == 'REP':
+        return party_lookup['TXHD'].get(last_name)
+    return None
+
+
 def save_graph(chamber: str, directory: str, plans_metadata: pd.DataFrame) -> None:
-    def parse_submitter(submitter: str) -> tuple[Optional[str], str]:
-        elements = submitter.split(" ")
-        cleaned_title = elements[0].removesuffix(".")
-        if len(elements) == 2:
-            name = elements[1]
-        elif len(elements) == 3:
-            name = elements[1][0] + " " + elements[2]
-        else:
-            error = f"Unknown Name Format - {submitter}"
-            raise RuntimeError(error)
-
-        if cleaned_title in ["SEN", "REP"]:
-            return cleaned_title, name
-        else:
-            return None, submitter
-
     def determine_node_color(submitter: tuple[Optional[str], str], party_lookup: dict[str, dict[str, str]],
                              is_max_plan: bool) -> str:
-        title = submitter[0]
-        last_name = submitter[1]
-        party = None
-        if title == 'SEN':
-            party = party_lookup['TXSN'].get(last_name)
-        elif title == 'REP':
-            party = party_lookup['TXHD'].get(last_name)
+        party = determine_party(party_lookup, submitter)
 
         if party is None:
             return "grey"
@@ -419,9 +435,9 @@ def save_graph(chamber: str, directory: str, plans_metadata: pd.DataFrame) -> No
             if "," not in element:
                 elements.append(element)
             else:
-                subelements = element.split(",")
+                sub_elements = element.split(",")
                 chunk_size = 3
-                chunks = [subelements[x:x + chunk_size] for x in range(0, len(subelements), chunk_size)]
+                chunks = [sub_elements[x:x + chunk_size] for x in range(0, len(sub_elements), chunk_size)]
                 elements.append("\n".join(f"{','.join(chunk)}" for chunk in chunks))
         return "\n".join(elements)
 
@@ -447,12 +463,12 @@ def save_graph(chamber: str, directory: str, plans_metadata: pd.DataFrame) -> No
 
     party_lookup = build_party_lookup(directory)
     admissible_metadata = [x for x in plans_metadata.itertuples() if x.plan in proposed_plans_graph.nodes]
-    submitters = {x.submitter: parse_submitter(x.submitter) for x in admissible_metadata}
+    parsed_submitters = {x.submitter: parse_submitter(x.submitter) for x in admissible_metadata}
 
     layout = 'fdp' if chamber == 'TXHD' else 'dot'
     pos = nx.nx_pydot.graphviz_layout(proposed_plans_graph, prog=layout)
-    labels = {x.plan: f"{x.plan}\n{build_multiline(submitters[x.submitter][1])}" for x in admissible_metadata}
-    node_colors = [determine_node_color(submitters[x.submitter], party_lookup,
+    labels = {x.plan: f"{x.plan}\n{build_multiline(parsed_submitters[x.submitter][1])}" for x in admissible_metadata}
+    node_colors = [determine_node_color(parsed_submitters[x.submitter], party_lookup,
                                         x.previous_plan == 0 or
                                         max_ammendments.get((x.submitter, x.previous_plan)) == x.plan)
                    for x in admissible_metadata]
@@ -585,7 +601,6 @@ def load_nodes_raw_filtered(directory: str) -> pd.DataFrame:
     else:
         node_data = pd.read_parquet(filtered_path)
     node_data.set_index('geoid', drop=False, inplace=True)
-    print(len(node_data))
     return node_data
 
 
@@ -610,20 +625,29 @@ def save_graph_filtered(chamber: str, directory: str, proposed_plans_metadata: p
     save_graph(chamber, directory, proposed_plans_metadata)
 
 
+def build_final_plan(chamber: str) -> int:
+    return {
+        'USCD': 2193,
+        'TXHD': 2316,
+        'TXSN': 2168
+    }[chamber]
+
+
 if __name__ == '__main__':
-    def main():
+    def main() -> None:
         print("start")
 
         t = Timer()
         t.start()
 
         chamber = 'TXSN'  # 'USCD'  #  'TXHD'  #
-        root_directory = 'C:/Users/rob/projects/election/rob/'
+        root_directory = 'G:/rob/projects/election/rob/'
         plans_directory = build_plans_directory(root_directory)
 
-        if False:
+        if True:
             # process_tabblock_data(chamber, root_directory)
             for chamber in cm.CHAMBERS:
+                print(f"Chamber: {chamber}")
                 update_plan_vectors(chamber, root_directory)
 
         if False:
@@ -639,7 +663,7 @@ if __name__ == '__main__':
             plans_metadata = load_plans_metadata(chamber, plans_directory)
             save_current_merged_plans(chamber, root_directory, plans_metadata, force=True)
 
-        if True:
+        if False:
             for chamber in cm.CHAMBERS:  # ['USCD']:  #
                 proposed_plans_metadata = load_plans_metadata(chamber, plans_directory)
                 save_graph_filtered(chamber, root_directory, proposed_plans_metadata)
