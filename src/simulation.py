@@ -1,22 +1,22 @@
+from addict import Dict
+from collections import defaultdict
 import copy
-import sys
-import matplotlib.pyplot as plt
+from datetime import datetime
+from functools import partial
+import geopandas as gpd
 from gerrychain import (GeographicPartition, Partition, Graph, MarkovChain,
                         updaters, constraints, accept, Election, metrics)
 from gerrychain.proposals import recom
 from gerrychain.metrics import efficiency_gap, mean_median
-from functools import partial
-import pandas as pd
-import geopandas as gpd
-import numpy as np
-import networkx as nx
-from datetime import datetime
-from shapely import wkt
-from collections import defaultdict
-from typing import Iterable, Any, NamedTuple, Callable, Optional
-import pickle
-from addict import Dict
 import math
+import matplotlib.pyplot as plt
+import pandas as pd
+import pickle
+import networkx as nx
+import numpy as np
+from shapely import wkt
+import sys
+from typing import Iterable, Any, NamedTuple, Callable, Optional
 
 import common as cm
 import data_transform as dt
@@ -426,7 +426,8 @@ class CountyDefect(NamedTuple):
     defect_intersected: int
 
 
-def determine_isolated_counties(graph: nx.Graph, counties: Iterable[str], minimum_whole_counties: int) -> set[str]:
+def determine_isolated_counties(graph: nx.Graph, minimum_whole_counties: int) -> set[str]:
+    counties = extract_counties(graph)
     county_defects = calculate_county_defects(graph, counties)
     return {x.county for x in county_defects if
             x.number_whole_districts >= minimum_whole_counties and

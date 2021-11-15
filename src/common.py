@@ -303,12 +303,11 @@ def build_USCD_random_seed_simulation_settings() -> Dict:
     return settings
 
 
-def build_report_directory_and_filename(chamber: str, directory: str, plan: int) -> tuple[str, str]:
+def build_reports_directory_and_filename(chamber: str, directory: str, plan: int) -> tuple[str, str]:
     reports_directory = build_reports_directory(directory)
     report_filename_prefix = f'report_{encode_chamber_character(chamber)}{plan}'
-    report_directory = f'{reports_directory}{report_filename_prefix}/'
-    ensure_directory_exists(report_directory)
-    return report_directory, report_filename_prefix
+    ensure_directory_exists(reports_directory)
+    return reports_directory, report_filename_prefix
 
 
 def build_reports_directory(directory: str) -> str:

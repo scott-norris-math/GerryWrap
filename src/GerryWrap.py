@@ -1,9 +1,11 @@
-import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+import numpy as np
+import pickle
+from random import shuffle
 import scipy.stats as stats
 import seaborn as sns
-from typing import Any
+from typing import Any, Optional
 
 
 USED_STUFFED_IN_PLOTS = False
@@ -811,8 +813,9 @@ def partisan_metrics_histpair(ensemble: np.ndarray, instance: np.ndarray) -> Any
     return myfigure
 
 
-def partisan_metrics_hist2D(ensemble: np.ndarray, instance: np.ndarray, comparison_label: str) -> Any:  # , statewide=None):
-    # get overall voteshare for party A
+def partisan_metrics_hist2D(ensemble: np.ndarray, instance: np.ndarray, comparison_label: str,
+                            number_points: Optional[int], previous_figure_point: Optional[tuple[Any, Any]]) -> Any:  # , statewide=None):
+    # get overall voteshare for party
     # overall_result = 0
     # if statewide != None:
     #    overall_result = statewide
@@ -823,11 +826,71 @@ def partisan_metrics_hist2D(ensemble: np.ndarray, instance: np.ndarray, comparis
     chainlength, districts = np.shape(ensemble)
     hmid = 1 + (districts - 1) / 2.0
 
-    # logic for odd or even numbers of districts
-    # odd_number_of_districts = (districts % 2 != 0)
-    odd_midindex = round(hmid) - 1
-    evl_midindex = round(hmid - 0.5) - 1
-    evr_midindex = round(hmid + 0.5) - 1
+    myfigure = None
+    if previous_figure_point is not None:
+        myfigure, previous_point = previous_figure_point
+
+    if myfigure is None:
+        # logic for odd or even numbers of districts
+        # odd_number_of_districts = (districts % 2 != 0)
+        odd_midindex = round(hmid) - 1
+        evl_midindex = round(hmid - 0.5) - 1
+        evr_midindex = round(hmid + 0.5) - 1
+
+        # space allocation
+        majority_vs = np.zeros((2, chainlength))
+        number_seats = np.zeros((2, chainlength))
+
+        # seats votes curve for the ensemble
+        for j in range(0, chainlength):
+            if j % 100000 == 0:
+                print(j)
+
+            race_results = sorted(ensemble[j, :], reverse=True)
+            mean_voteshare = np.mean(race_results)
+            seatsvotes1 = mean_voteshare - np.array(race_results) + 0.5
+            seatsvotes2 = np.flip(1 - seatsvotes1)
+
+            # What is the percentage nec. for a majority?
+            majority_vs[0, j] = seatsvotes1[odd_midindex] if districts % 2 != 0 else 0.5 * (
+                    seatsvotes1[evl_midindex] + seatsvotes1[evr_midindex])
+            majority_vs[1, j] = seatsvotes2[odd_midindex] if districts % 2 != 0 else 0.5 * (
+                    seatsvotes2[evl_midindex] + seatsvotes2[evr_midindex])
+
+            # What is the number of seats arising from a split vote?
+            lastseat1 = np.count_nonzero(seatsvotes1 <= 0.5) - 1
+            v0 = seatsvotes1[lastseat1]
+            v1 = seatsvotes1[lastseat1 + 1]
+            number_seats[0, j] = lastseat1 + 1 + (0.5 - v0) / (v1 - v0)
+
+            lastseat2 = np.count_nonzero(seatsvotes2 <= 0.5) - 1
+            v0 = seatsvotes2[lastseat2]
+            v1 = seatsvotes2[lastseat2 + 1]
+            number_seats[1, j] = lastseat2 + 1 + (0.5 - v0) / (v1 - v0)
+
+        #   Voteshares
+        vote_diffs = majority_vs[0, :] - majority_vs[1, :]
+        # mvdiff = np.median(vote_diffs)
+
+        # for making it look nice
+        # vdmin = min(vote_diffs)
+        # vdmax = max(vote_diffs)
+        # vbinedge_min = np.floor(vdmin)
+        # vbinedge_max = np.ceil(vdmax)
+        # vbinbounds = np.arange(vbinedge_min, vbinedge_max + .01, .01)
+        # vdbuff = (vdmax - vdmin) * .2
+
+        #   Number of Seats
+        seat_diffs = number_seats[0, :] - number_seats[1, :]
+        # mndiff = np.median(seat_diffs)
+
+        # for making it look nice
+        # ndmin = min(seat_diffs)
+        # ndmax = max(seat_diffs)
+        # nbinedge_min = np.floor(ndmin)
+        # nbinedge_max = np.ceil(ndmax)
+        # nbinbounds = np.arange(nbinedge_min - 0.5, nbinedge_max + 0.5)
+        # ndbuff = (ndmax - ndmin) * .2
 
     # information for the instance
     actual_race_results = sorted(instance, reverse=True)
@@ -840,100 +903,46 @@ def partisan_metrics_hist2D(ensemble: np.ndarray, instance: np.ndarray, comparis
             actual_seatsvotes1[round(hmid - 0.5) - 1] + actual_seatsvotes1[round(hmid - 0.5) - 1])
     actual_majority_vs2 = actual_seatsvotes2[round(hmid) - 1] if districts % 2 != 0 else 0.5 * (
             actual_seatsvotes2[round(hmid - 0.5) - 1] + actual_seatsvotes2[round(hmid - 0.5) - 1])
-    cvdiff = actual_majority_vs1 - actual_majority_vs2
+    actual_vote_diff = actual_majority_vs1 - actual_majority_vs2
 
     # What is the percentage nec. for a majority?
     actual_number_seats1 = np.count_nonzero(actual_seatsvotes1 <= 0.5)
     actual_number_seats2 = np.count_nonzero(actual_seatsvotes2 <= 0.5)
-    cndiff = actual_number_seats1 - actual_number_seats2
+    actual_seat_diff = actual_number_seats1 - actual_number_seats2
 
-    # space allocation
-    majority_vs = np.zeros((2, chainlength))
-    number_seats = np.zeros((2, chainlength))
+    # np.histogram(vote_diffs, bins=vbinbounds)
+    # print("MM Enacted Plan Percentile = %8.6f" % stats.percentileofscore(vote_diffs, actual_vote_diff))
 
-    # seats votes curve for the ensemble
-    for j in range(0, chainlength):
-        if j % 100000 == 0:
-            print(j)
+    # np.histogram(seat_diffs, bins=nbinbounds)
+    # print("PB Enacted Plan Percentile = %8.6f" % stats.percentileofscore(seat_diffs, actual_seat_diff))
 
-        race_results = sorted(ensemble[j, :], reverse=True)
-        mean_voteshare = np.mean(race_results)
-        seatsvotes1 = mean_voteshare - np.array(race_results) + 0.5
-        seatsvotes2 = np.flip(1 - seatsvotes1)
+    if myfigure is None:
+        myfigure = plt.figure(figsize=(6.5, 5))
 
-        # What is the percentage nec. for a majority?
-        majority_vs[0, j] = seatsvotes1[odd_midindex] if districts % 2 != 0 else 0.5 * (
-                seatsvotes1[evl_midindex] + seatsvotes1[evr_midindex])
-        majority_vs[1, j] = seatsvotes2[odd_midindex] if districts % 2 != 0 else 0.5 * (
-                seatsvotes2[evl_midindex] + seatsvotes2[evr_midindex])
+        if number_points is not None:
+            indices = list(range(0, chainlength))
+            shuffle(indices)
+            indices = indices[0: number_points]
+            vote_diffs = vote_diffs[indices]
+            seat_diffs = seat_diffs[indices]
 
-        # What is the number of seats arising from a split vote?
-        lastseat1 = np.count_nonzero(seatsvotes1 <= 0.5) - 1
-        v0 = seatsvotes1[lastseat1]
-        v1 = seatsvotes1[lastseat1 + 1]
-        number_seats[0, j] = lastseat1 + 1 + (0.5 - v0) / (v1 - v0)
+        # Basic 2D density plot
+        sns.set_style("white")
+        ensemble_axes = sns.kdeplot(x=vote_diffs, y=seat_diffs, cmap="Blues", shade=True, cbar=True,
+                                    levels=[.0001, .001, .01, .05, .25, .5, .75, 1.0])  # , bw_adjust=.5
 
-        lastseat2 = np.count_nonzero(seatsvotes2 <= 0.5) - 1
-        v0 = seatsvotes2[lastseat2]
-        v1 = seatsvotes2[lastseat2 + 1]
-        number_seats[1, j] = lastseat2 + 1 + (0.5 - v0) / (v1 - v0)
+        plt.xticks(ensemble_axes.get_xticks(), map(lambda x: format(100 * x, ".0f"), ensemble_axes.get_xticks()))
+        plt.xlabel("Mean-Median %")
+        plt.ylabel("Partisan Bias")
+        plt.title("2D Histogram of Ensemble Partisan Metrics")
+        plt.legend(loc='best')
+        plt.tight_layout()
+    else:
+        previous_point.remove()
 
-    #
-    #   Voteshares
-    #
-    # things we need to plot
-    vdiffs = majority_vs[0, :] - majority_vs[1, :]
-    # mvdiff = np.median(vdiffs)
+    previous_point = plt.plot([actual_vote_diff], [actual_seat_diff], 'rs', label=comparison_label)[0]
 
-    # for making it look nice
-    vdmin = min(vdiffs)
-    vdmax = max(vdiffs)
-    vbinedge_min = np.floor(vdmin)
-    vbinedge_max = np.ceil(vdmax)
-    vbinbounds = np.arange(vbinedge_min, vbinedge_max + .01, .01)
-
-    # vdbuff = (vdmax - vdmin) * .2
-
-    np.histogram(vdiffs, bins=vbinbounds)
-    print("MM Enacted Plan Percentile = %8.6f" % stats.percentileofscore(vdiffs, cvdiff))
-
-    #
-    #   Number of Seats
-    #
-    # things we need to plot
-    ndiffs = number_seats[0, :] - number_seats[1, :]
-    # mndiff = np.median(ndiffs)
-
-    # for making it look nice
-    ndmin = min(ndiffs)
-    ndmax = max(ndiffs)
-    nbinedge_min = np.floor(ndmin)
-    nbinedge_max = np.ceil(ndmax)
-    nbinbounds = np.arange(nbinedge_min - 0.5, nbinedge_max + 0.5)
-    # ndbuff = (ndmax - ndmin) * .2
-
-    np.histogram(ndiffs, bins=nbinbounds)
-    print("PB Enacted Plan Percentile = %8.6f" % stats.percentileofscore(ndiffs, cndiff))
-
-    # 2D histogram
-
-    myfigure = plt.figure(figsize=(6.5, 5))
-    # Basic 2D density plot
-    sns.set_style("white")
-    print("KDE Plot Start")
-    figure = sns.kdeplot(x=vdiffs, y=ndiffs, cmap="Blues", shade=True, cbar=True,
-                         levels=[.0001, .001, .01, .05, .25, .5, .75, 1.0])  # , bw_adjust=.5
-    plt.xticks(figure.get_xticks(), map(lambda x: format(100 * x, ".0f"), figure.get_xticks()))
-    # plt.plot([cvdiff], [cndiff], 'rs', label="Current Plan")
-    print("KDE Plot End")
-    plt.plot([cvdiff], [cndiff], 'rs', label=comparison_label)
-    plt.xlabel("Mean-Median %")
-    plt.ylabel("Partisan Bias")
-    plt.title("2D Histogram of Ensemble Partisan Metrics")
-    plt.legend(loc='best')
-    plt.tight_layout()
-
-    return myfigure
+    return myfigure, previous_point
 
 
 def mean_median_distribution(ensemble: np.ndarray, instance: np.ndarray,
@@ -983,34 +992,58 @@ def mean_median_distribution(ensemble: np.ndarray, instance: np.ndarray,
 
 
 def racial_vs_political_deviations(ensemble_p: np.ndarray, instance_p: np.ndarray, ensemble_r: np.ndarray,
-                                   instance_r: np.ndarray, title: str) -> Any:
-    # get shape of data
+                                   instance_r: np.ndarray, title: str, use_global_medians: bool,
+                                   display_ensemble: bool, number_points: Optional[int],
+                                   previous_graphics: Optional[tuple[Any, tuple[Any, list, list[plt.Annotation]]]]) \
+        -> tuple[Any, tuple[Any, list, list[plt.Annotation]]]:
     chainlength, districts = np.shape(ensemble_p)
-    dist_list = np.arange(1, districts + 1)
 
     # sort the instance_p, and record the district numbers
     sorted_districts_p = np.argsort(instance_p) + 1
-    sorted_voteshares_p = sorted(instance_p)
-    median_voteshares_p = np.median(ensemble_p)
-    vote_diffs_by_rank = sorted_voteshares_p - median_voteshares_p
-    vote_diffs_by_dist = [vote_diffs_by_rank[ii] for ii in np.argsort(sorted_districts_p)]
+    sorted_instance_p = sorted(instance_p)
+    median_p = np.median(ensemble_p) if use_global_medians else np.median(ensemble_p, axis=0)
+    instance_diffs_by_rank_p = sorted_instance_p - median_p
+    instance_diffs_p = [instance_diffs_by_rank_p[i] for i in np.argsort(sorted_districts_p)]
 
     # sort the instance_r, and record the district numbers
     sorted_districts_r = np.argsort(instance_r) + 1
-    sorted_popshares_r = sorted(instance_r)
-    median_popshares_r = np.median(ensemble_r)
-    pop_diffs_by_rank = sorted_popshares_r - median_popshares_r
-    pop_diffs_by_dist = [pop_diffs_by_rank[ii] for ii in np.argsort(sorted_districts_r)]
+    sorted_instance_r = sorted(instance_r)
+    median_r = np.median(ensemble_r) if use_global_medians else np.median(ensemble_r, axis=0)
+    instance_diffs_by_rank_r = sorted_instance_r - median_r
+    instance_diffs_r = [instance_diffs_by_rank_r[i] for i in np.argsort(sorted_districts_r)]
 
-    fig, ax = plt.subplots(figsize=(10, 6))
-    fig.suptitle(title)
-    ax.plot(pop_diffs_by_dist, vote_diffs_by_dist, 'bs')
-    ax.plot([0, 0], [-.3, .3], 'k--')
-    ax.plot([-.2, .4], [0, 0], 'k--')
-    ax.set_xlabel('Minority Population Deviation')
-    ax.set_ylabel('Democratic Voter Deviation')
+    if previous_graphics is not None:
+        fig, (ax, points, annotations) = previous_graphics
+        for point in points:
+            point.remove()
+        for annotation in annotations:
+            annotation.remove()
+    else:
+        fig, ax = plt.subplots(figsize=(10, 6))
+        fig.suptitle(title)
 
-    for i, txt in enumerate(dist_list):
-        ax.annotate(txt, (pop_diffs_by_dist[i] + .005, vote_diffs_by_dist[i] + .005))
+        if display_ensemble:
+            ensemble_diffs_p = (ensemble_p - median_p).flatten()
+            ensemble_diffs_r = (ensemble_r - median_r).flatten()
 
-    return fig
+            if number_points is not None:
+                indices = list(range(0, chainlength))
+                shuffle(indices)
+                indices = indices[0: number_points]
+                ensemble_diffs_p = ensemble_diffs_p[indices]
+                ensemble_diffs_r = ensemble_diffs_r[indices]
+
+            sns.set_style("white")
+            sns.kdeplot(x=ensemble_diffs_r, y=ensemble_diffs_p, cmap="Blues", shade=True, cbar=True,
+                        levels=[.0001, .001, .01, .05, .25, .5, .75, 1.0])  # , bw_adjust=.5
+
+        ax.plot([0, 0], [-.3, .3], 'k--')
+        ax.plot([-.2, .4], [0, 0], 'k--')
+        ax.set_xlabel('Minority Population Deviation')
+        ax.set_ylabel('Democratic Voter Deviation')
+
+    points = ax.plot(instance_diffs_r, instance_diffs_p, 'bs')
+    annotations = [ax.annotate(str(i+1), (instance_diffs_r[i] + .005, instance_diffs_p[i] + .005))
+                   for i in np.arange(0, districts)]
+
+    return fig, (ax, points, annotations)

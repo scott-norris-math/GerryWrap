@@ -16,6 +16,7 @@
 \usepackage{caption}
 \hypersetup{pdftex, colorlinks=true, linkcolor=blue, citecolor=blue, filecolor=blue, urlcolor=blue, pdftitle=, pdfauthor=Barreiro; Andrea, pdfsubject=, pdfkeywords=}
 \usepackage[pdftex]{graphicx}
+
 % Text styles
 \newcommand\textstyleInternetlink[1]{\textcolor[rgb]{0.019607844,0.3882353,0.75686276}{#1}}
 \newcommand\textstylenormaltextrun[1]{#1}
@@ -255,7 +256,10 @@ the value for the Proposed map is shown in red. In Figure~\ref{fig:5} we show th
 
 \section*{Appendix: All Plots}
 
-{\centering \includegraphics[width=7.3307in,height=7in]{\VAR{report_directory}report_\VAR{plan_name}_diff_map.pdf} \par}
+\begin{figure*}
+{\centering \includegraphics[width=7.3307in,height=7in]{\VAR{report_directory}report_\VAR{plan_name}_diff_map.png} \par}
+\caption*{\href{\VAR{url_root}report_\VAR{plan_name}_diff_map.pdf}{Click here} to download a higher resolution version of this image.}
+\end{figure*}
 
 {\centering \includegraphics[width=7.3307in,height=3.5in]{\VAR{plots_directory}seats-voteshares-ensemble-comps-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-PRES20.pdf} \par}
 {\centering \includegraphics[width=7.3307in,height=3.5in]{\VAR{plots_directory}seats-voteshares-ensemble-comps-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-SEN20.pdf} \par}

@@ -115,7 +115,6 @@ def save_node_data(directory: str, seed_filename_prefix: str, node_data: pd.Data
     node_data['polygon'] = [x.wkt for x in node_data['polygon']]
     node_data_path = build_node_data_path(redistricting_data_directory, seed_filename_prefix)
     node_data.to_parquet(node_data_path, index=False)
-    # node_data.to_csv(f'{redistricting_data_directory}{stem}.csv', index=False, quoting=csv.QUOTE_ALL)
 
 
 def build_seed_filename_prefix(chamber: str, geographic_unit: str, suffix: int) -> str:
@@ -260,9 +259,7 @@ def determine_isolated_edges(graph: nx.Graph, isolated_counties: Iterable[str]) 
 
 def remove_isolated_county_edges(dual_graph: nx.Graph, county_district_graph: nx.Graph,
                                  minimum_whole_counties: int) -> None:
-    counties = si.extract_counties(county_district_graph)
-
-    isolated_counties = si.determine_isolated_counties(county_district_graph, counties, minimum_whole_counties)
+    isolated_counties = si.determine_isolated_counties(county_district_graph, minimum_whole_counties)
     print(f"Isolated Counties: {sorted(isolated_counties)}")
 
     edges = determine_isolated_edges(dual_graph, isolated_counties)
@@ -471,12 +468,9 @@ if __name__ == '__main__':
                                     minimum_whole_counties)
 
         if False:
-            display_unique_plans_defects(ensemble_directory)
-
-        if False:
             # It is assumed at this point that the reduced ensemble has been generated
             # Break up the generated plans into regional plans
-            isolated_counties = si.determine_isolated_counties(county_district_graph, counties, minimum_whole_counties)
+            isolated_counties = si.determine_isolated_counties(county_district_graph, minimum_whole_counties)
             save_unique_region_plans(directory, reduced_ensemble_description, dual_graph, isolated_counties)
 
         if False:

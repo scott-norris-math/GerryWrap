@@ -1,8 +1,8 @@
-import os
+from addict import Dict
 import numpy as np
+import os
 import pandas as pd
 import scipy.stats as stats
-from addict import Dict
 from typing import Callable, Iterable, Optional
 
 import common as cm
@@ -291,7 +291,7 @@ def build_plan_name_cell_html(chamber: str, plan: int) -> str:
 
     plan_name = cm.build_plan_name(chamber, plan)
     media_anchor_id = media_anchor_map.get((chamber, plan))
-    return f'<a href="{report_url_prefix}{plan_name}.pdf">{plan_name}</a>' \
+    return plan_name if plan == 2100 else f'<a href="{report_url_prefix}{plan_name}.pdf">{plan_name}</a>' \
         if media_anchor_id is None else f'<a href="-/media/{media_anchor_id}.ashx">{plan_name}</a>'
 
 
@@ -376,7 +376,8 @@ if __name__ == '__main__':
 
             for chamber in admissible_chambers:
                 plans_metadata = pp.load_plans_metadata(chamber, pp.build_plans_directory(directory))
-                valid_plans_metadata = plans_metadata[plans_metadata['invalid'] == False].copy()
+                valid_plans_metadata = plans_metadata[(plans_metadata['plan'] > 2100) &
+                                                      (~plans_metadata['invalid'])].copy()
                 valid_plans_metadata.set_index('plan', drop=False, inplace=True)
 
                 print(f"Chamber: {chamber} {len([x for x in valid_plans_metadata.itertuples() if x.plan >= 2101])}")
