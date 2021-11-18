@@ -11,7 +11,7 @@ import pickle
 from addict import Dict
 
 
-CHAMBERS = ['TXSN', 'USCD', 'TXHD']
+CHAMBERS = ['USCD', 'TXSN', 'TXHD']
 
 
 def build_suffix(suffix: str) -> str:
@@ -61,19 +61,24 @@ def unzip_file(output_directory: str, zip_path: str) -> None:
     print(f"Unzipping: {zip_path} End")
 
 
-def load_ensemble_matrix_sorted_transposed(input_directory: str, statistic_name: str) -> np.ndarray:
-    path = input_directory + statistic_name + '.npz'
-    return load_ensemble_matrix_sorted_transposed_from_path(path)
+def build_ensemble_matrix_path(directory: str, statistic_name: str) -> str:
+    return directory + statistic_name + '.npz'
 
 
-def load_ensemble_matrix_sorted_transposed_from_path(path: str) -> np.ndarray:
+def load_ensemble_matrix(directory: str, statistic_name: str) -> np.ndarray:
+    path = build_ensemble_matrix_path(directory, statistic_name)
+    return load_numpy_compressed(path)
+
+
+def load_ensemble_matrix_sorted(directory: str, statistic_name: str) -> np.ndarray:
+    path = build_ensemble_matrix_path(directory, statistic_name)
+    return load_ensemble_matrix_sorted_from_path(path)
+
+
+def load_ensemble_matrix_sorted_from_path(path: str) -> np.ndarray:
     ensemble_matrix = load_numpy_compressed(path)
     for row in ensemble_matrix:
         row.sort()
-    ensemble_matrix = ensemble_matrix.transpose()
-    districts, number_plans = np.shape(ensemble_matrix)
-    print(districts, "districts")
-    print(number_plans, "plans")
     return ensemble_matrix
 
 

@@ -117,7 +117,7 @@ def load_ensemble_statistics(chamber: str, root_directory: str, input_prefix: st
     ensemble_description = cm.build_ensemble_description(chamber, seed_description, ensemble_number)
     ensemble_directory = cm.build_ensemble_directory(root_directory, ensemble_description)
 
-    ensemble = cm.load_ensemble_matrix_sorted_transposed(ensemble_directory, input_prefix)
+    ensemble = cm.load_ensemble_matrix_sorted(ensemble_directory, input_prefix).transpose()
 
     print("Calculating Ensemble Matrix Statistics")
     mean_median, partisan_bias = calculate_ensemble_matrix_statistics(ensemble)

@@ -81,7 +81,7 @@ def save_election_plots(chamber: str, root_directory: str, ensemble_directory: s
         print(election)
 
         statistic_name = dt.build_election_filename_prefix(election)
-        ensemble_matrix = cm.load_ensemble_matrix_sorted_transposed(ensemble_directory, statistic_name)
+        ensemble_matrix = cm.load_ensemble_matrix_sorted(ensemble_directory, statistic_name)
         ensemble_matrix_transposed = ensemble_matrix.transpose()
         plans = ([] if current_plan is None else [current_plan]) + comparison_plans
         plan_vectors = cm.load_plan_vectors(chamber, root_directory, statistic_name, plans)
@@ -93,21 +93,21 @@ def save_election_plots(chamber: str, root_directory: str, ensemble_directory: s
             if True:
                 current_plan_override = None if chamber == 'USCD' else current_plan
 
-                save_seats_voteshares_ensemble_comps_plot(chamber, plots_directory, election, ensemble_matrix,
-                                                          current_plan_override, comparison_plan, plan_vectors,
-                                                          plan_pnums, plan_legend_names, plan_colors)
-                save_vote_vector_ensemble_plot(chamber, plots_directory, election, ensemble_matrix, comparison_plan,
-                                               plan_vectors)
-                save_seats_votes_ensemble_plot(chamber, plots_directory, election, ensemble_matrix, comparison_plan,
-                                               plan_vectors)
-                save_mean_median_partisan_bias_plot(chamber, plots_directory, election, ensemble_matrix,
+                save_seats_voteshares_ensemble_comps_plot(chamber, plots_directory, election,
+                                                          ensemble_matrix_transposed, current_plan_override,
+                                                          comparison_plan, plan_vectors, plan_pnums, plan_legend_names,
+                                                          plan_colors)
+                save_vote_vector_ensemble_plot(chamber, plots_directory, election, ensemble_matrix_transposed,
+                                               comparison_plan, plan_vectors)
+                save_seats_votes_ensemble_plot(chamber, plots_directory, election, ensemble_matrix_transposed,
+                                               comparison_plan, plan_vectors)
+                save_mean_median_partisan_bias_plot(chamber, plots_directory, election, ensemble_matrix_transposed,
                                                     comparison_plan, plan_vectors)
 
             if True:
                 comparison_label = build_plan_label(chamber, comparison_plan)
                 partisan_metrics_figure, partisan_metrics_point = \
-                    gw.partisan_metrics_hist2D(ensemble_matrix_transposed,
-                                               plan_vectors[comparison_plan], comparison_label,
+                    gw.partisan_metrics_hist2D(ensemble_matrix, plan_vectors[comparison_plan], comparison_label,
                                                None, partisan_metrics_figure_point)
                 partisan_metrics_figure_point = partisan_metrics_figure, partisan_metrics_point
                 partisan_metrics_figure.savefig(
@@ -116,7 +116,7 @@ def save_election_plots(chamber: str, root_directory: str, ensemble_directory: s
             clear_plots()
 
 
-def hist_ensemble_comps(chamber: str, ensemble_matrix_transposed: np.ndarray, perc_thresh: float, title: str,
+def hist_ensemble_comps(chamber: str, ensemble_matrix: np.ndarray, perc_thresh: float, title: str,
                         hist_x_axis_label: str, fill_color: str, do_small_histogram_pics: bool = True,
                         comp_plans: bool = False, comp_plans_vv: list[np.ndarray] = [],
                         comp_plans_names: list[str] = [], comp_plans_colors: list[str] = []) -> Any:
@@ -145,7 +145,7 @@ def hist_ensemble_comps(chamber: str, ensemble_matrix_transposed: np.ndarray, pe
 
     hist_y_axis_label = 'Plans'
 
-    values = np.count_nonzero(ensemble_matrix_transposed > perc_thresh, axis=1)
+    values = np.count_nonzero(ensemble_matrix > perc_thresh, axis=1)
 
     if do_small_histogram_pics:
         # This sets approximate range of histogram
@@ -223,7 +223,8 @@ def save_vote_vector_ensemble_plot(chamber: str, output_directory: str, election
     plot_title = get_chamber_pretty_name(chamber) + ' District Results  (' + get_election_pretty_name(
         election) + ')'
     plot = gw.vote_vector_ensemble(np.column_stack([plan_vectors[plan], ensemble_matrix]), plot_title, pc_thresh=.01,
-                                   have_actual=True, comparison_label=build_plan_label(chamber, plan))
+                                   have_actual=True, comparison_label=build_plan_label(chamber, plan),
+                                   display_districts_numbers=(chamber != 'TXHD'))
     plot.savefig(f'{output_directory}seats-voteshares-ensemble-enacted-{chamber}-{plan}-{election}.pdf')
 
 
@@ -251,7 +252,7 @@ def save_racial_plots(chamber: str, root_directory: str, ensemble_directory: str
 
         racial_group_file_prefix = dt.transform_racial_group_file_prefix(racial_group)
         statistic_name = dt.build_race_filename_prefix(racial_group_file_prefix)
-        ensemble_matrix = cm.load_ensemble_matrix_sorted_transposed(ensemble_directory, statistic_name)
+        ensemble_matrix = cm.load_ensemble_matrix_sorted(ensemble_directory, statistic_name)
         ensemble_matrix_transposed = ensemble_matrix.transpose()
         plans = ([] if current_plan is None else [current_plan]) + comparison_plans
         plan_vectors = cm.load_plan_vectors(chamber, root_directory, statistic_name, plans)
@@ -260,12 +261,12 @@ def save_racial_plots(chamber: str, root_directory: str, ensemble_directory: str
             print(comparison_plan)
 
             if True:
-                save_racial_ensemble_comps_plot(chamber, plots_directory, racial_group, ensemble_matrix,
+                save_racial_ensemble_comps_plot(chamber, plots_directory, racial_group, ensemble_matrix_transposed,
                                                 current_plan, comparison_plan, plan_vectors, plan_pnums,
                                                 plan_legend_names, plan_colors)
 
             if True:
-                save_racial_histograms(chamber, plots_directory, racial_group, ensemble_matrix_transposed,
+                save_racial_histograms(chamber, plots_directory, racial_group, ensemble_matrix,
                                        current_plan, comparison_plan, plan_vectors, plan_legend_names, plan_colors,
                                        True)
 
@@ -279,9 +280,9 @@ def save_racial_ensemble_comps_plot(chamber: str, output_directory: str, group: 
     title = get_chamber_pretty_name(chamber) + ' District Results  (' + get_racial_group_pretty_name(group) + ')'
     group_fill_color = get_racial_group_fill_color(group)
     plot = save_violin_comparison_plots(chamber, ensemble_matrix, current_plan, comparison_plan, plan_pnums,
-                                        plan_legend_names,
-                                        plan_colors, plan_vectors, title, fill_color=group_fill_color,
-                                        h_line_label="Needed for Majority", y_axis_label="Voting Age Population")
+                                        plan_legend_names, plan_colors, plan_vectors, title,
+                                        fill_color=group_fill_color, h_line_label="Needed for Majority",
+                                        y_axis_label="Voting Age Population")
 
     plot.savefig(f'{output_directory}violin-plot-{chamber}-{current_plan}-{comparison_plan}-{group}.pdf')
     plt.rcParams.update(plt.rcParamsDefault)
@@ -363,17 +364,17 @@ def save_plots(chamber: str, root_directory: str, seed_description: str, ensembl
 
     if True:
         save_election_racial_plots(chamber, root_directory, ensemble_directory, plots_directory, current_plan,
-                                   comparison_plans, True, True)
+                                   comparison_plans, True, False, False)  # True, True, False)  # False, False, True)  #
 
 
 def save_election_racial_plots(chamber: str, root_directory: str, ensemble_directory: str, plots_directory: str,
                                current_plan: Optional[int], comparison_plans: list[int], use_global_medians: bool,
-                               display_ensemble: bool) -> None:
+                               display_ensemble: bool, use_sorting: bool) -> None:
     for election in get_elections():
         print(f"Election: {election}")
         statistic_name = dt.build_election_filename_prefix(election)
-        ensemble_matrix_election = cm.load_ensemble_matrix_sorted_transposed(ensemble_directory,
-                                                                             statistic_name).transpose()
+        ensemble_matrix_election = cm.load_ensemble_matrix_sorted(ensemble_directory, statistic_name) \
+            if use_sorting else cm.load_ensemble_matrix(ensemble_directory, statistic_name)
 
         plans = ([] if current_plan is None else [current_plan]) + comparison_plans
         plan_vectors_election = cm.load_plan_vectors(chamber, root_directory, statistic_name, plans)
@@ -381,8 +382,8 @@ def save_election_racial_plots(chamber: str, root_directory: str, ensemble_direc
             print(f"Racial Group: {racial_group}")
             racial_group_file_prefix = dt.transform_racial_group_file_prefix(racial_group)
             statistic_name = dt.build_race_filename_prefix(racial_group_file_prefix)
-            ensemble_matrix_racial = cm.load_ensemble_matrix_sorted_transposed(ensemble_directory,
-                                                                               statistic_name).transpose()
+            ensemble_matrix_racial = cm.load_ensemble_matrix_sorted(ensemble_directory, statistic_name) \
+                if use_sorting else cm.load_ensemble_matrix(ensemble_directory, statistic_name)
             plans = ([] if current_plan is None else [current_plan]) + comparison_plans
             plan_vectors_racial = cm.load_plan_vectors(chamber, root_directory, statistic_name, plans)
 
@@ -391,16 +392,18 @@ def save_election_racial_plots(chamber: str, root_directory: str, ensemble_direc
                 print(f"Plan: {comparison_plan}")
                 title = get_chamber_pretty_name(chamber) + '  (' + get_racial_group_pretty_name(
                     racial_group) + ' - ' + get_election_pretty_name(election) + ')'
-                number_points = 10000000
+                number_points = 2000000  # 15000000  #
                 with Timer(name='racial_vs_political'):
                     figure, previous_axes_points_annotations = \
-                        gw.racial_vs_political_deviations(ensemble_matrix_election, plan_vectors_election[comparison_plan],
+                        gw.racial_vs_political_deviations(ensemble_matrix_election,
+                                                          plan_vectors_election[comparison_plan],
                                                           ensemble_matrix_racial, plan_vectors_racial[comparison_plan],
                                                           title, use_global_medians, display_ensemble, number_points,
-                                                          previous_graphics)
+                                                          True, previous_graphics)
                 previous_graphics = figure, previous_axes_points_annotations
                 infix = '' if use_global_medians else '-rank-medians'
-                infix += '-with_ensemble' if display_ensemble else ''
+                sorted_string = '-sorted' if use_sorting else ''
+                infix += f'-with-ensemble{sorted_string}' if display_ensemble else ''
                 figure.savefig(
                     f'{plots_directory}racial-political-deviations{infix}-{chamber}-{comparison_plan}-{election}-{racial_group}.pdf')
             clear_plots()
@@ -642,7 +645,7 @@ if __name__ == '__main__':
                     comparison_plans = [pp.build_final_plan(chamber)]
                 else:
                     comparison_plans = sorted(pp.get_valid_plans(chamber, pp.build_plans_directory(directory)) - {2100},
-                        reverse=True)
+                                              reverse=True)
 
                 seed_description, ensemble_number = cm.get_current_ensemble(chamber)
                 save_plots(chamber, directory, seed_description, ensemble_number, current_plan, comparison_plans)
@@ -679,13 +682,14 @@ if __name__ == '__main__':
             for chamber in cm.CHAMBERS:  # ['USCD', 'TXHD']:  #
                 print(chamber)
 
-                if False:
+                if True:
                     plan = pp.build_final_plan(chamber)
                     save_proposed_plan_diff_map(chamber, directory, plan)
                     save_proposed_plan_diff_map_reversed(chamber, directory, plan)
                     break
 
-                for plan in sorted(pp.get_valid_plans(chamber, pp.build_plans_directory(directory)) - {2100}, reverse=True):
+                for plan in sorted(pp.get_valid_plans(chamber, pp.build_plans_directory(directory)) - {2100},
+                                   reverse=True):
                     print(plan)
                     save_proposed_plan_diff_map(chamber, directory, plan)
                     save_proposed_plan_diff_map_reversed(chamber, directory, plan)

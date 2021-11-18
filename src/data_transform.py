@@ -257,13 +257,13 @@ def save_ensemble_matrices(chamber: str, directory: str, redistricting_data_file
         np.savez_compressed(statistics_paths[statistic], ensemble_matrix)
 
 
-def save_unique_plans(ensemble_directory, plans: np.ndarray) -> None:
+def save_unique_plans(ensemble_directory: str, plans: np.ndarray) -> None:
     unique_plans = cm.determine_unique_plans(plans)
     print(f"Number Unique Plans: {len(unique_plans)}")
     np.savez_compressed(f'{ensemble_directory}/unique_plans.npz', np.array(unique_plans))
 
 
-def compare_statistics(matrix_1, matrix_2, sort) -> None:
+def compare_statistics(matrix_1: np.ndarray, matrix_2: np.ndarray, sort: bool) -> None:
     if sort:
         matrix_1.sort(axis=1)
         matrix_2.sort(axis=1)
@@ -275,7 +275,7 @@ def compare_statistics(matrix_1, matrix_2, sort) -> None:
         print(f"different arrays")
 
 
-def convert_to_csv(ensemble_directory, filename_prefix):
+def convert_to_csv(ensemble_directory: str, filename_prefix: str) -> None:
     array = cm.load_numpy_compressed(f'{ensemble_directory}{filename_prefix}.npz')
     cm.save_numpy_csv(f'{ensemble_directory}{filename_prefix}.csv', array)
 
@@ -299,21 +299,34 @@ if __name__ == '__main__':
             save_unique_plans(ensemble_directory, plans)
 
         if True:
-            chamber = 'TXHD'  # 'TXSN'  # 'USCD' #
-            plan = 2176
-            settings = cm.build_proposed_plan_simulation_settings(chamber, plan) # cm.build_TXSN_random_seed_simulation_settings()  # cm.build_USCD_random_seed_simulation_settings()  #
+            chamber = 'USCD'  # 'TXHD'  #'TXSN'  #
+            if chamber == 'TXHD':
+                plan = 2176
+                settings = cm.build_proposed_plan_simulation_settings(chamber, plan)
+                max_file_number = 0
+                ensemble_description = f'{chamber}_{plan}_product_1'
+                redistricting_data_filename = 'nodes_TX_2020_cnty_cntyvtd_sldu.parquet'
+            elif chamber == 'TXSN':
+                settings = cm.build_TXSN_random_seed_simulation_settings()
+                max_file_number = 7
+                ensemble_description = 'TXSN_random_seed_2'
+                redistricting_data_filename = 'nodes_TX_2020_cnty_cntyvtd_sldu.parquet'
+            elif chamber == 'USCD':
+                settings = cm.build_USCD_random_seed_simulation_settings()
+                max_file_number = 15
+                ensemble_description = 'USCD_random_seed_2'
+                redistricting_data_filename = 'nodes_TX_2020_cntyvtd_cd.csv'
 
             seeds_directory = cm.build_seeds_directory(directory)
             dual_graph = nx.read_gpickle(seeds_directory + settings.dual_graph_filename)
 
-            ensemble_description = f'{chamber}_{plan}_product_1' # f'{chamber}_random_seed_2' #
-            ensemble_directory = cm.build_ensemble_directory(directory, ensemble_description)
-
-            convert_to_csv(ensemble_directory, 'total_pop')
-            convert_to_csv(ensemble_directory, 'o17_pop')
-
-            # save_ensemble_matrices(chamber, directory, 'nodes_TX_2020_cnty_cntyvtd_sldu.parquet', dual_graph,  # nodes_TX_2020_cntyvtd_cd.csv
-            #                        ensemble_description, range(0, 7))  # 15)) #
+            if False:
+                ensemble_directory = cm.build_ensemble_directory(directory, ensemble_description)
+                convert_to_csv(ensemble_directory, 'total_pop')
+                convert_to_csv(ensemble_directory, 'o17_pop')
+            else:
+                save_ensemble_matrices(chamber, directory, redistricting_data_filename, dual_graph,
+                                       ensemble_description, range(0, max_file_number))
 
         if False:
             chamber = 'USCD'
@@ -340,7 +353,7 @@ if __name__ == '__main__':
             merged_data_directory = root_directory + chamber + '/'
             cm.ensure_directory_exists(merged_data_directory)
 
-            merge_data(data_directories, merged_data_directory)
+            merge_plan_data(data_directories, merged_data_directory)
 
             # df = pd.read_parquet(merged_data_meeting_path)
             # save_numpy_arrays(chamber, df, merged_data_directory)
