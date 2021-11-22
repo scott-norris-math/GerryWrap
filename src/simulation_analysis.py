@@ -488,10 +488,6 @@ if __name__ == '__main__':
 
             np.savez_compressed(f'{product_ensemble_directory}defects.npz', np.array(defects))
 
-        if True:
-            dt.save_ensemble_matrices(chamber, directory, settings.redistricting_data_filename, dual_graph,
-                                      product_ensemble_description, [0])
-
         if False:
             geographic_unit = 'cntyvtd'
 

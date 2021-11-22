@@ -81,14 +81,14 @@ def build_matched_plan_sizes_path(analysis_directory: str, suffix: str = '') -> 
     return f'{analysis_directory}matched_plan_sizes{cm.build_suffix(suffix)}.npz'
 
 
-def save_intersection_sizes(analysis_directory: str, initial_plan: np.ndarray, plans: np.ndarray,
+def save_intersection_sizes(analysis_directory: str, reference_plan: np.ndarray, plans: np.ndarray,
                             node_weights: np.ndarray, value_type: str, suffix: str = '') -> None:
     number_plans = len(plans)
     intersection_sizes = np.ndarray(number_plans, dtype='object')
     for x in range(0, number_plans):
         if x % 1000 == 0:
             print(x)
-        intersection_sizes[x] = calculate_intersection_sizes(initial_plan, plans[x], node_weights, value_type)
+        intersection_sizes[x] = calculate_intersection_sizes(reference_plan, plans[x], node_weights, value_type)
     np.savez_compressed(build_intersection_sizes_path(analysis_directory, suffix), intersection_sizes)
 
 
@@ -161,7 +161,7 @@ def save_matchings(analysis_directory: str, intersection_sizes: np.ndarray, suff
 
 def load_matchings(analysis_directory: str, suffix: str = '') -> np.ndarray:
     path = build_matchings_path(analysis_directory, suffix)
-    return np.load(path)['arr_0']
+    return cm.load_numpy_compressed(path)
 
 
 def save_matched_intersection_sizes(analysis_directory: str, matchings: np.ndarray, intersection_sizes: np.ndarray,
@@ -324,6 +324,11 @@ def plot_beta(data: Iterable[float]) -> None:
     plt.show()
 
 
+def build_vector(graph: nx.Graph, column: str) -> np.array:
+    data = [(x, y[column]) for x, y in graph.nodes.items()]
+    return np.array([y for _, y in sorted(data, key=lambda x: x[0])])
+
+
 if __name__ == '__main__':
     def main() -> None:
         directory = 'G:/rob/projects/election/rob/'
@@ -336,36 +341,40 @@ if __name__ == '__main__':
 
             plans = cm.load_plans_from_path(f'{ensemble_directory}unique_plans.npz')
 
-            reference_plan = plans[100000]
+            # seeds_directory = cm.build_seeds_directory(directory)
+            # settings = cm.build_TXSN_random_seed_simulation_settings()
+            # dual_graph = nx.read_gpickle(seeds_directory + settings.dual_graph_filename)
 
-            seeds_directory = cm.build_seeds_directory(directory)
-            settings = cm.build_TXSN_random_seed_simulation_settings()
-            dual_graph = nx.read_gpickle(seeds_directory + settings.dual_graph_filename)
-            total_populations = [(x, y['total_pop']) for x, y in dual_graph.nodes.items()]
-            node_weights = np.array([y for _, y in sorted(total_populations, key=lambda x: x[0])])
+            chamber = 'TXSN'
+            plan = pp.build_final_plan(chamber)
+            census_chamber_name = dt.get_census_chamber_name(chamber)
+            graph = si.load_plan_seed_with_data(chamber, directory, plan, [census_chamber_name])
+
+            node_weights = build_vector(graph, 'total_pop')
+
+            reference_plan = np.array([int(x) for x in build_vector(graph, census_chamber_name)])
+            print(reference_plan)
+            #reference_plan = plans[100000]
 
             value_type = 'uint'
-            suffix = 'total_pop'
-
+            suffix = 'total_pop_2100'
             # save_intersection_sizes(analysis_directory, reference_plan, plans, node_weights, value_type, suffix)
             intersection_sizes = load_intersection_sizes(analysis_directory, suffix)
 
             # save_matchings(analysis_directory, intersection_sizes, suffix)
-            # matchings = load_matchings(analysis_directory, suffix)
+            matchings = load_matchings(analysis_directory, suffix)
 
             # save_matched_intersection_sizes(analysis_directory, matchings, intersection_sizes, value_type, suffix)
             matched_intersections_sizes = load_matched_intersection_sizes(analysis_directory, suffix)
 
-            # symmetric_difference_sizes = calculate_symmetric_difference_sizes(matched_intersections_sizes)
-            # save_symmetric_difference_sizes(analysis_directory, symmetric_difference_sizes, suffix)
+            symmetric_difference_sizes = calculate_symmetric_difference_sizes(matched_intersections_sizes)
+            save_symmetric_difference_sizes(analysis_directory, symmetric_difference_sizes, suffix)
 
-            # save_matched_plan_sizes(analysis_directory, matched_intersections_sizes, value_type, suffix)
+            save_matched_plan_sizes(analysis_directory, matched_intersections_sizes, value_type, suffix)
             matched_plan_sizes = load_matched_plan_sizes(analysis_directory, suffix)
 
-            return
-
-            # plt.plot(distances)
-            # plt.show()
+            plt.plot(distances)
+            plt.show()
 
             # plot_distances_skewnormal(number_nodes, distances)
             plot_distances_beta(number_nodes, symmetric_difference_sizes)

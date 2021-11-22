@@ -207,13 +207,18 @@ def combine_and_fix_redistricting_data_file(directory: str) -> None:
 
 
 def save_ensemble_matrices(chamber: str, directory: str, redistricting_data_filename: str, graph: nx.Graph,
-                           ensemble_description: str, file_numbers: Iterable[int]) -> None:
+                           ensemble_description: str, use_unique_plans, file_numbers: Iterable[int]) -> None:
     node_data = load_filtered_redistricting_data(directory, redistricting_data_filename)
-    plans = cm.load_plans_from_files(directory, ensemble_description, file_numbers)
-
     statistics_settings = build_statistics_settings()
     ensemble_directory = cm.build_ensemble_directory(directory, ensemble_description)
-    statistics_paths = {x: f'{ensemble_directory}{x}.npz' for x, _ in statistics_settings}
+
+    if use_unique_plans:
+        plans = cm.load_plans_from_path(f'{ensemble_directory}unique_plans.npz')
+    else:
+        plans = cm.load_plans_from_files(directory, ensemble_description, file_numbers)
+
+    suffix = '_unique' if use_unique_plans else ''
+    statistics_paths = {x: f'{ensemble_directory}{x}{suffix}.npz' for x, _ in statistics_settings}
     statistics_settings = [(x, y) for x, y in statistics_settings if not exists(statistics_paths[x])]
     if len(statistics_settings) == 0:
         print("All ensemble matrices already exist")
@@ -289,34 +294,35 @@ if __name__ == '__main__':
 
         directory = 'G:/rob/projects/election/rob/'
 
+        chamber = 'TXSN'  # 'USCD'  # 'TXHD'  #
+
+        if chamber == 'TXHD':
+            plan = 2176
+            settings = cm.build_proposed_plan_simulation_settings(chamber, plan)
+            max_file_number = 0
+            ensemble_description = f'{chamber}_{plan}_product_1'
+            redistricting_data_filename = 'nodes_TX_2020_cnty_cntyvtd_sldu.parquet'
+        elif chamber == 'TXSN':
+            settings = cm.build_TXSN_random_seed_simulation_settings()
+            max_file_number = 7
+            ensemble_description = 'TXSN_random_seed_2'
+            redistricting_data_filename = 'nodes_TX_2020_cnty_cntyvtd_sldu.parquet'
+        elif chamber == 'USCD':
+            settings = cm.build_USCD_random_seed_simulation_settings()
+            max_file_number = 15
+            ensemble_description = 'USCD_random_seed_2'
+            redistricting_data_filename = 'nodes_TX_2020_cntyvtd_cd.csv'
+
         if False:
             combine_and_fix_redistricting_data_file(directory)
 
         if False:
-            ensemble_description = 'TXHD_2176_Reduced_3'
-            plans = cm.load_plans_from_files(directory, ensemble_description, [12])
+            # ensemble_description = 'TXHD_2176_Reduced_3'
+            plans = cm.load_plans_from_files(directory, ensemble_description, range(0, max_file_number))
             ensemble_directory = cm.build_ensemble_directory(directory, ensemble_description)
             save_unique_plans(ensemble_directory, plans)
 
         if True:
-            chamber = 'USCD'  # 'TXHD'  #'TXSN'  #
-            if chamber == 'TXHD':
-                plan = 2176
-                settings = cm.build_proposed_plan_simulation_settings(chamber, plan)
-                max_file_number = 0
-                ensemble_description = f'{chamber}_{plan}_product_1'
-                redistricting_data_filename = 'nodes_TX_2020_cnty_cntyvtd_sldu.parquet'
-            elif chamber == 'TXSN':
-                settings = cm.build_TXSN_random_seed_simulation_settings()
-                max_file_number = 7
-                ensemble_description = 'TXSN_random_seed_2'
-                redistricting_data_filename = 'nodes_TX_2020_cnty_cntyvtd_sldu.parquet'
-            elif chamber == 'USCD':
-                settings = cm.build_USCD_random_seed_simulation_settings()
-                max_file_number = 15
-                ensemble_description = 'USCD_random_seed_2'
-                redistricting_data_filename = 'nodes_TX_2020_cntyvtd_cd.csv'
-
             seeds_directory = cm.build_seeds_directory(directory)
             dual_graph = nx.read_gpickle(seeds_directory + settings.dual_graph_filename)
 
@@ -326,7 +332,7 @@ if __name__ == '__main__':
                 convert_to_csv(ensemble_directory, 'o17_pop')
             else:
                 save_ensemble_matrices(chamber, directory, redistricting_data_filename, dual_graph,
-                                       ensemble_description, range(0, max_file_number))
+                                       ensemble_description, True, None)  # range(0, max_file_number)
 
         if False:
             chamber = 'USCD'

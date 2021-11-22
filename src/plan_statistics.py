@@ -384,8 +384,7 @@ if __name__ == '__main__':
 
                 valid_plans_metadata.sort_index(ascending=False, inplace=True)
 
-                save_statistics_rows(chamber, directory, ensemble_statistics, file_prefix,
-                                     valid_plans_metadata)
+                save_statistics_rows(chamber, directory, ensemble_statistics, file_prefix, valid_plans_metadata)
 
 
     main()

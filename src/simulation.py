@@ -88,12 +88,24 @@ def fix_election_columns_text(df: pd.DataFrame) -> None:
         'President_2020_R_Trump_general': 'President_2020_general_R_Trump'}, inplace=True)
 
 
-def load_graph_with_geometry(directory: str, dual_graph_filename: str, geodata: gpd.GeoDataFrame,
+def load_graph_with_data(directory: str, dual_graph_filename: str, geodata: gpd.GeoDataFrame,
                              columns: Optional[list[str]] = ['geometry']) -> Graph:
     seeds_directory = cm.build_seeds_directory(directory)
     dual_graph = nx.read_gpickle(seeds_directory + dual_graph_filename)
     graph = Graph(dual_graph, geometry=geodata)
     graph.join(geodata, columns=columns, right_index='geoid')
+    return graph
+
+
+def load_plan_seed_with_data(chamber:str, directory: str, plan: int, columns: list[str]) -> Graph:
+    settings = cm.build_proposed_plan_simulation_settings(chamber, plan)
+    geodata = load_geodataframe(directory, settings.redistricting_data_filename)
+    return load_graph_with_data(directory, settings.dual_graph_filename, geodata, columns)
+
+
+def load_graph_with_geometry(directory: str, dual_graph_filename: str, geodata: gpd.GeoDataFrame,
+                             columns: Optional[list[str]] = ['geometry']) -> Graph:
+    graph = load_graph_with_data(directory, dual_graph_filename, geodata, columns)
 
     # TODO: this may be unnecessary - check
     filtered_df = geodata[geodata['geoid'].isin(graph.nodes().keys())]

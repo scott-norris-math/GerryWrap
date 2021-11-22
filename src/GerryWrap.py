@@ -5,6 +5,7 @@ import scipy.stats as stats
 import seaborn as sns
 from typing import Any, Optional, Iterable
 
+
 USED_STUFFED_IN_PLOTS = True
 
 

@@ -17,12 +17,13 @@ from shapely.geometry.multipolygon import MultiPolygon
 from typing import Iterable, Any, Optional
 
 import common as cm
-import plan_statistics as ps
-import GerryWrap as gw
-from timer import Timer
-import proposed_plans as pp
 import data_transform as dt
+import GerryWrap as gw
+import plan_statistics as ps
+import proposed_plans as pp
 import simulation as si
+from timer import Timer
+
 
 BLACK = 'k'
 
@@ -364,7 +365,7 @@ def save_plots(chamber: str, root_directory: str, seed_description: str, ensembl
 
     if True:
         save_election_racial_plots(chamber, root_directory, ensemble_directory, plots_directory, current_plan,
-                                   comparison_plans, True, False, False)  # True, True, False)  # False, False, True)  #
+                                   comparison_plans, True, True, False)  # False, False, True)  # True, False, False)  #
 
 
 def save_election_racial_plots(chamber: str, root_directory: str, ensemble_directory: str, plots_directory: str,
@@ -392,7 +393,7 @@ def save_election_racial_plots(chamber: str, root_directory: str, ensemble_direc
                 print(f"Plan: {comparison_plan}")
                 title = get_chamber_pretty_name(chamber) + '  (' + get_racial_group_pretty_name(
                     racial_group) + ' - ' + get_election_pretty_name(election) + ')'
-                number_points = 2000000  # 15000000  #
+                number_points = 5000000
                 with Timer(name='racial_vs_political'):
                     figure, previous_axes_points_annotations = \
                         gw.racial_vs_political_deviations(ensemble_matrix_election,

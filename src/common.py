@@ -61,17 +61,17 @@ def unzip_file(output_directory: str, zip_path: str) -> None:
     print(f"Unzipping: {zip_path} End")
 
 
-def build_ensemble_matrix_path(directory: str, statistic_name: str) -> str:
-    return directory + statistic_name + '.npz'
+def build_ensemble_matrix_path(directory: str, statistic_name: str, suffix: str) -> str:
+    return f'{directory}{statistic_name}{suffix}.npz'
 
 
-def load_ensemble_matrix(directory: str, statistic_name: str) -> np.ndarray:
-    path = build_ensemble_matrix_path(directory, statistic_name)
+def load_ensemble_matrix(directory: str, statistic_name: str, suffix: str = '') -> np.ndarray:
+    path = build_ensemble_matrix_path(directory, statistic_name, suffix)
     return load_numpy_compressed(path)
 
 
-def load_ensemble_matrix_sorted(directory: str, statistic_name: str) -> np.ndarray:
-    path = build_ensemble_matrix_path(directory, statistic_name)
+def load_ensemble_matrix_sorted(directory: str, statistic_name: str, suffix:str = '') -> np.ndarray:
+    path = build_ensemble_matrix_path(directory, statistic_name, suffix)
     return load_ensemble_matrix_sorted_from_path(path)
 
 
