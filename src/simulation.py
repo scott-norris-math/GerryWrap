@@ -64,8 +64,8 @@ def load_geodataframe(directory: str, redistricting_data_filename: str = None) -
         county_geodata = gpd.GeoDataFrame(county_data, geometry='geometry')
         county_geodata.geometry = county_geodata.geometry.buffer(0)
 
-        county_geodata['geoid'] = county_geodata['geoid'].astype('str').apply(lambda p: p.zfill(3))
-        county_vtd_geodata['geoid'] = county_vtd_geodata['geoid'].astype('str').apply(lambda p: p.zfill(9))
+        county_geodata['geoid'] = county_geodata['geoid'].astype('str').apply(lambda x: x.zfill(3))
+        county_vtd_geodata['geoid'] = county_vtd_geodata['geoid'].astype('str').apply(lambda x: x.zfill(9))
 
         geodata = pd.concat([county_vtd_geodata, county_geodata]).drop_duplicates().set_index('geoid', drop=False)
     else:
@@ -269,6 +269,8 @@ def run_chain_impl(chain: MarkovChain, elections: Iterable[Election], output_dir
     step_number = 0
     maps_directory = build_maps_directory(output_directory)
     cm.ensure_directory_exists(maps_directory)
+
+    plan_hashes = set()
     for partition in chain:
         if step_number % 10000 == 0:
             partition.plot()
@@ -278,12 +280,12 @@ def run_chain_impl(chain: MarkovChain, elections: Iterable[Election], output_dir
         if step_number % 100 == 0:
             print(f"{datetime.now().strftime('%H:%M:%S')} Step: {step_number}")
 
-            # print("Partition Assignments")
-            # display_partition(chain.initial_state, partition)
-            #
-            # print("Partition List")
-            # partition_as_list = build_canonical_partition_list(partition)
-            # print(partition_as_list)
+        current_plan = build_canonical_plan_from_partition(node_id_to_index, partition)
+        plan_hash = hash(current_plan)
+        if plan_hash not in plan_hashes:
+            plan_hashes.add(plan_hash)
+        else:
+            continue
 
         plan_index = step_number % plans_output_size
         if plan_index == 0:
@@ -293,7 +295,6 @@ def run_chain_impl(chain: MarkovChain, elections: Iterable[Election], output_dir
             number_nodes = len(partition.graph.nodes)
             plans_array = np.ndarray([plans_output_size, number_nodes], np.uint8)
 
-        current_plan = build_canonical_plan_from_partition(node_id_to_index, partition)
         for district_index, node_set in enumerate(current_plan):
             district_index_npu8 = np.uint8(district_index) + 1
             for node_index in node_set:
@@ -306,6 +307,7 @@ def run_chain_impl(chain: MarkovChain, elections: Iterable[Election], output_dir
 
     if save_data is not None:
         save_data(output_directory, data)
+
     save_partial_plans(output_directory, plans_array, plans_output_size, step_number)
 
 
@@ -683,33 +685,15 @@ if __name__ == '__main__':
     def main() -> None:
         directory = 'G:/rob/projects/election/rob/'
 
-        if False:
-            canonical_plans = set()
-            number_previous_canonical_plans = 0
-            for x in range(0, 22):
-                print(f"Plans: {x}")
-                plans = cm.load_plans(directory, ensemble_description, x)
-                for i, plan in enumerate(plans):
-                    if i % 1000 == 0:
-                        print(i)
+        if True:
+            chamber = 'DCN'
+            settings = cm.build_proposed_plan_simulation_settings(chamber, 83605)
+            # settings = cm.build_TXSN_random_seed_simulation_settings()
 
-                    canonical_plans.add(cm.calculate_plan_hash(plan))
+            number_steps = 500000000  # 300  #
 
-                number_canonical_plans = len(canonical_plans)
-                number_new_canonical_plans = number_canonical_plans - number_previous_canonical_plans
-                print(
-                    f"Number Canonical Plans: {number_new_canonical_plans} {number_canonical_plans} {number_canonical_plans / ((x + 1) * 10000)}")
-                number_previous_canonical_plans = number_canonical_plans
-
-        if False:
-            chamber = 'TXHD'
-            # settings = cm.build_proposed_plan_simulation_settings(chamber, 2176)
-            settings = cm.build_TXSN_random_seed_simulation_settings()
-
-            number_steps = 500000  # 300  #
-
-            suffix = '2176_Reduced_Test'
-            ensemble_number = 1
+            suffix = '83605'
+            ensemble_number = 2
             ensemble_description = cm.build_ensemble_description(chamber, suffix, ensemble_number)
             output_directory = cm.build_ensemble_directory(directory, ensemble_description)
 

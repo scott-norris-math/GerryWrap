@@ -10,8 +10,9 @@ import plotting as pl
 def determine_number_plans(chamber: str) -> str:
     return {
         'USCD': "1,500,000",
-        'TXHD': '1,000,000',
-        'TXSN': '617,270'
+        'TXHD': "1,000,000",
+        'TXSN': "617,270",
+        'DCN': "500,000"
     }[chamber]
 
 
@@ -71,11 +72,14 @@ if __name__ == '__main__':
 
         j2_template = latex_jinja_env.get_template('Stmt-on-template.tex')
 
-        for chamber in cm.CHAMBERS:  # ['TXSN']:  # , 'USCD'
+        for chamber in ['DCN']:  # cm.CHAMBERS:
             print(f"Chamber: {chamber}")
 
             plans = sorted(pp.get_valid_plans(chamber, pp.build_plans_directory(directory)) - {2100}, reverse=True)
             for plan in plans:
+                #if plan >= 93173:
+                #    continue
+
                 print(f"Plan: {plan}")
                 save_report(chamber, directory, j2_template, plan)
                 # break

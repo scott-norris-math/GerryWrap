@@ -7,6 +7,7 @@ from typing import Callable, Iterable, Optional
 
 import common as cm
 import data_transform as dt
+import plotting as pl
 import proposed_plans as pp
 
 
@@ -27,6 +28,7 @@ def calculate_partisan_bias(plan_vector: np.ndarray) -> float:
     number_seats1 = np.count_nonzero(seats_votes1 <= 0.5)
     number_seats2 = np.count_nonzero(seats_votes2 <= 0.5)
 
+    # 2 * np.count_nonzero(np.array(plan_vector) >= mean_voteshare) - number districts
     return number_seats1 - number_seats2
 
 
@@ -41,7 +43,7 @@ def determine_statements_v1(chamber: str, mm_ensemble: np.ndarray, pb_ensemble: 
 
     number_ensemble_plans = len(mm_ensemble)
     for plan in plans:
-        plan_name = f'{cm.encode_chamber_character(chamber)}{plan}'
+        plan_name = f'{cm.encode_chamber(chamber)}{plan}'
         statements.append(plan_name)
 
         plan_vector = plan_vectors[plan]
@@ -101,6 +103,8 @@ def calculate_ensemble_matrix_statistics(ensemble_matrix: np.ndarray) -> tuple[n
     partisan_bias = np.zeros(number_ensemble_plans)
 
     for i in np.arange(number_ensemble_plans):
+        if i % 100000 == 0:
+            print(i)
         mean_median[i] = calculate_mean_median(ensemble_matrix[:, i])
         partisan_bias[i] = calculate_partisan_bias(ensemble_matrix[:, i])
 
@@ -142,15 +146,16 @@ def determine_plans(chamber: str, directory: str) -> list[int]:
 
 def save_statistics_statements(chamber: str, directory: str,
                                ensemble_statistics: dict[str, tuple[np.ndarray, np.ndarray]],
-                               file_prefix: str, plans: Iterable[int]) -> None:
+                               election: str, plans: Iterable[int]) -> None:
     plans = sorted(list(plans))
     ensemble_mean_median, ensemble_partisan_bias = ensemble_statistics[chamber]
+    file_prefix = dt.build_election_filename_prefix(election)
     plan_vectors = cm.load_plan_vectors(chamber, directory, file_prefix, plans)
 
     ensemble_statistics, plan_statistics_list = calculate_statistics(chamber, ensemble_mean_median,
                                                                      ensemble_partisan_bias, plans, plan_vectors)
     statements = determine_statements(ensemble_statistics, plan_statistics_list)
-    cm.save_all_text("\n".join(statements), f'{directory}statistics_{chamber}.txt')
+    cm.save_all_text("\n".join(statements), f'{directory}statistics_{chamber}_{election}.txt')
 
 
 def calculate_statistics(chamber: str, mm_ensemble: np.ndarray, pb_ensemble: np.ndarray, plans: Iterable[int],
@@ -177,7 +182,7 @@ def calculate_statistics(chamber: str, mm_ensemble: np.ndarray, pb_ensemble: np.
     for plan in plans:
         plan_statistics = Dict()
         plan_statistics.plan = plan
-        plan_statistics.plan_name = f'{cm.encode_chamber_character(chamber)}{plan}'
+        plan_statistics.plan_name = f'{cm.encode_chamber(chamber)}{plan}'
 
         plan_vector = plan_vectors[plan]
 
@@ -216,10 +221,10 @@ def calculate_statistics(chamber: str, mm_ensemble: np.ndarray, pb_ensemble: np.
         # If overall plan favors D, we check in that direction
         if ckPlg == 1:
             plan_statistics.less_gerrymandered_than = np.count_nonzero(
-                np.logical_and(mm_ensemble >= mm_plan, pb_ensemble < pb_plan))
+                np.logical_and(mm_ensemble >= mm_plan, pb_ensemble <= pb_plan))
         elif ckPlg == -1:
             plan_statistics.less_gerrymandered_than = np.count_nonzero(
-                np.logical_and(mm_ensemble <= mm_plan, pb_ensemble > pb_plan))
+                np.logical_and(mm_ensemble <= mm_plan, pb_ensemble >= pb_plan))
 
         plan_statistics_list.append(plan_statistics)
 
@@ -296,6 +301,9 @@ def build_plan_name_cell_html(chamber: str, plan: int) -> str:
 
 
 def build_submitter_string(parsed_submitter: tuple[Optional[str], str], submitter_party: Optional[str]):
+    if not any(parsed_submitter):
+        return ""
+
     s = f"{parsed_submitter[0]} " if parsed_submitter[0] is not None else ""
     s = f"{s}{parsed_submitter[1]}"
 
@@ -306,7 +314,8 @@ def build_submitter_string(parsed_submitter: tuple[Optional[str], str], submitte
 
 
 def build_row(chamber: str, number_ensemble_plans: int, plan_statistics: Dict,
-              parsed_submitter: tuple[Optional[str], str], submitter_party: Optional[str]) -> str:
+              parsed_submitter: tuple[Optional[str], str], submitter_party: Optional[str],
+              description: Optional[str]) -> str:
     def format_float(x: float) -> str:
         return format(x, '.2f').rstrip('0').rstrip('.')
 
@@ -333,6 +342,7 @@ def build_row(chamber: str, number_ensemble_plans: int, plan_statistics: Dict,
                                               number_ensemble_plans)
 
     return row_text.format(build_plan_name_cell_html(chamber, plan_statistics.plan),
+                           description if description is not None else
                            build_submitter_string(parsed_submitter, submitter_party),
                            format_float(plan_statistics.mm_plan), format_float(100 * (1 - plan_statistics.mm_portion)),
                            plan_statistics.pb_plan, format_float(plan_statistics.pb_percentile), plan_statistics.bias,
@@ -340,9 +350,13 @@ def build_row(chamber: str, number_ensemble_plans: int, plan_statistics: Dict,
 
 
 def save_statistics_rows(chamber: str, directory: str, ensemble_statistics: dict[str, tuple[np.ndarray, np.ndarray]],
-                         file_prefix: str, plans_metadata: pd.DataFrame) -> None:
+                         election: str, plans_metadata: pd.DataFrame, use_description: bool) -> None:
+    def build_description(plan_metadata) -> str:
+        return "" if plan_metadata.description is np.nan else plan_metadata.description
+
     ensemble_mean_median, ensemble_partisan_bias = ensemble_statistics[chamber]
     plans = [x.plan for x in plans_metadata.itertuples()]
+    file_prefix = dt.build_election_filename_prefix(election)
     plan_vectors = cm.load_plan_vectors(chamber, directory, file_prefix, plans)
 
     ensemble_calculation, plan_statistics_list = calculate_statistics(chamber, ensemble_mean_median,
@@ -355,13 +369,13 @@ def save_statistics_rows(chamber: str, directory: str, ensemble_statistics: dict
     for plan_statistics in plan_statistics_list:
         plan = plan_statistics.plan
         plan_metadata = plans_metadata.loc[plan]
-        parsed_submitter = pp.parse_submitter(plan_metadata.submitter)
-        submitter_party = pp.determine_party(party_lookup, parsed_submitter)
-        rows.append(build_row(chamber, ensemble_calculation.number_ensemble_plans, plan_statistics,
-                              parsed_submitter, submitter_party))
+        parsed_submitter = pp.parse_submitter(plan_metadata.submitter) if chamber in cm.CHAMBERS else (None, "")
+        submitter_party = pp.determine_party(party_lookup, parsed_submitter) if chamber in cm.CHAMBERS else ""
+        rows.append(build_row(chamber, ensemble_calculation.number_ensemble_plans, plan_statistics, parsed_submitter,
+                              submitter_party, build_description(plan_metadata) if use_description else None))
 
-    cm.save_all_text("\n".join(rows[0:6]), f'{directory}statistics_rows_{chamber}_short.txt')
-    cm.save_all_text("\n".join(rows), f'{directory}statistics_rows_{chamber}.txt')
+    cm.save_all_text("\n".join(rows[0:6]), f'{directory}statistics_rows_{chamber}_{election}_short.txt')
+    cm.save_all_text("\n".join(rows), f'{directory}statistics_rows_{chamber}_{election}.txt')
 
 
 if __name__ == '__main__':
@@ -369,22 +383,25 @@ if __name__ == '__main__':
         directory = 'G:/rob/projects/election/rob/'
 
         if True:
-            file_prefix = dt.build_election_filename_prefix('PRES20')
-            admissible_chambers = cm.CHAMBERS  # ['TXHD']
-            ensemble_statistics = {chamber: load_ensemble_statistics(chamber, directory, file_prefix) for
-                                   chamber in admissible_chambers}
+            admissible_chambers = cm.CHAMBERS  # ['DCN']  #
+            for election in pl.get_elections():
+                file_prefix = dt.build_election_filename_prefix(election)
+                ensemble_statistics = {chamber: load_ensemble_statistics(chamber, directory, file_prefix) for
+                                       chamber in admissible_chambers}
 
-            for chamber in admissible_chambers:
-                plans_metadata = pp.load_plans_metadata(chamber, pp.build_plans_directory(directory))
-                valid_plans_metadata = plans_metadata[(plans_metadata['plan'] > 2100) &
-                                                      (~plans_metadata['invalid'])].copy()
-                valid_plans_metadata.set_index('plan', drop=False, inplace=True)
+                for chamber in admissible_chambers:
+                    plans_metadata = pp.load_plans_metadata(chamber, pp.build_plans_directory(directory))
+                    valid_plans_metadata = plans_metadata[(chamber == 'DCN' or plans_metadata['plan'] > 2100) &
+                                                          (~plans_metadata['invalid'])].copy()
+                    valid_plans_metadata.set_index('plan', drop=False, inplace=True)
 
-                print(f"Chamber: {chamber} {len([x for x in valid_plans_metadata.itertuples() if x.plan >= 2101])}")
+                    print(f"Chamber: {chamber} {len([x for x in valid_plans_metadata.itertuples() if x.plan >= 2101])}")
 
-                valid_plans_metadata.sort_index(ascending=False, inplace=True)
+                    valid_plans_metadata.sort_index(ascending=False, inplace=True)
 
-                save_statistics_rows(chamber, directory, ensemble_statistics, file_prefix, valid_plans_metadata)
+                    valid_plans = [x.plan for x in valid_plans_metadata.itertuples() if not x.invalid]
+                    save_statistics_statements(chamber, directory, ensemble_statistics, election, valid_plans)
+                    save_statistics_rows(chamber, directory, ensemble_statistics, election, valid_plans_metadata, True)
 
 
     main()

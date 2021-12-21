@@ -1,21 +1,29 @@
+import glob
+import matplotlib.pyplot as plt
+import networkx as nx
+import numpy as np
+from operator import itemgetter
 import os
 import pandas as pd
-from typing import Callable, Optional
-import glob
-from shutil import copy2
-import networkx as nx
-import matplotlib.pyplot as plt
 import pylab
-from operator import itemgetter
-import numpy as np
+from shutil import copy2
+from typing import Callable, Optional
 
 import common as cm
 import data_transform as dt
+import partitions_analysis as pa
+import simulation_analysis as sa
 from timer import Timer
 
 
-SCTBKEY_COLUMN = 'SCTBKEY'
-DISTRICT_COLUMN = 'DISTRICT'
+def build_plan_columns(chamber: str) -> tuple[str, str]:
+    if chamber == 'DCN':
+        return 'id-dallastx-dallastx_blocks-14-CouncilDistricts', 'assignment'
+    elif chamber in cm.CHAMBERS:
+        return 'SCTBKEY', 'DISTRICT'
+    else:
+        error = f'Unknown chamber {chamber}'
+        raise RuntimeError(error)
 
 
 def build_columns_path(chamber: str, directory: str) -> str:
@@ -36,12 +44,13 @@ def determine_data_tablock_columns(df: pd.DataFrame) -> list[str]:
 def save_data_tablock_columns(chamber: str, directory: str, data_path: str) -> None:
     data_df = pd.read_parquet(data_path)
     print("Data: " + str(len(data_df)))
-    data_columns = ['geoid', 'county', dt.get_census_chamber_name(chamber),
-                    'total_pop'] + determine_data_tablock_columns(data_df)
+    data_columns = ['geoid', 'county', 'total_pop'] + determine_data_tablock_columns(data_df)
+    if chamber in cm.CHAMBERS:
+        data_columns = data_columns + [dt.get_census_chamber_name(chamber)]
 
     print("Data Columns: " + str(len(data_columns)))
     print(data_columns)
-    columns_df = pd.DataFrame(data_columns, columns=["column"])
+    columns_df = pd.DataFrame(data_columns, columns=['column'])
     columns_df.to_csv(build_columns_path(chamber, directory))
 
 
@@ -50,6 +59,9 @@ def save_filtered_data(chamber: str, directory: str, data_path: str) -> None:
     print(str(len(columns)) + " " + str(columns))
 
     data_df = pd.read_parquet(data_path, columns=columns)
+    if chamber == 'DCN':
+        data_df['geoid'] = data_df['geoid'].apply(lambda x: x[2:])
+
     data_df.sort_values(by=['geoid'], inplace=True)
     print("Filtered Data: " + str(len(data_df)))
 
@@ -66,17 +78,23 @@ def build_data_filtered_path(chamber: str, directory: str, suffix: str) -> str:
 
 
 def process_tabblock_data(chamber: str, directory: str) -> None:
-    bq_chamber_name = dt.get_census_chamber_name(chamber)
-    data_path = \
-        build_redistricting_data_directory(directory) + \
-        'redistricting_data_nodes_TX_nodes_TX_2020_tabblock_' + \
-        bq_chamber_name + '_contract0.parquet'
+    data_path = build_redistricting_data_directory(directory) + (
+        'redistricting_data_nodes_TX_nodes_TX_2020_tabblock_' +
+        dt.get_census_chamber_name(chamber) + '_contract0.parquet' if chamber in cm.CHAMBERS
+        else 'redistricting_data_nodes_TX_nodes_TX_2020_raw.parquet')
+
     save_data_tablock_columns(chamber, directory, data_path)
     save_filtered_data(chamber, directory, data_path)
 
 
-def load_block_equivalency_file(path: str) -> pd.DataFrame:
-    return pd.read_csv(path, dtype={SCTBKEY_COLUMN: str, DISTRICT_COLUMN: int})
+def load_block_equivalency_file(chamber: str, directory: str, plan: int) -> pd.DataFrame:
+    path = build_plan_path(chamber, directory, plan)
+    return load_block_equivalency_file_from_path(chamber, path)
+
+
+def load_block_equivalency_file_from_path(chamber: str, path: str) -> pd.DataFrame:
+    geoid_column, district_column = build_plan_columns(chamber)
+    return pd.read_csv(path, dtype={geoid_column: str, district_column: int})
 
 
 def build_plans_raw_directory(directory: str) -> str:
@@ -84,7 +102,7 @@ def build_plans_raw_directory(directory: str) -> str:
 
 
 def build_plan_raw_path(chamber: str, directory: str, plan: int) -> str:
-    return f'{build_plans_raw_directory(directory)}PLAN{cm.encode_chamber_character(chamber)}{plan}.csv'
+    return f'{build_plans_raw_directory(directory)}PLAN{cm.encode_chamber(chamber)}{plan}.csv'
 
 
 def build_plans_directory(directory: str) -> str:
@@ -96,46 +114,50 @@ def build_plan_metadata_path(chamber: str, plan_directory: str) -> str:
 
 
 def build_plan_path(chamber: str, directory: str, plan: int) -> str:
-    return f'{build_plans_directory(directory)}PLAN{cm.encode_chamber_character(chamber)}{plan}.csv'
+    return f'{build_plans_directory(directory)}PLAN{cm.encode_chamber(chamber)}{plan}.csv'
 
 
-def normalize_block_equivalency_df(bef_df: pd.DataFrame) -> None:
-    if SCTBKEY_COLUMN in bef_df.columns:
-        bef_df['geoid'] = [str(x)[2:] for x in bef_df[SCTBKEY_COLUMN]]
-        bef_df.drop(columns=[SCTBKEY_COLUMN], inplace=True)
+def normalize_block_equivalency_df(chamber: str, bef_df: pd.DataFrame) -> None:
+    geoid_column, _ = build_plan_columns(chamber)
+    if geoid_column in bef_df.columns:
+        bef_df['geoid'] = [str(x)[2:] for x in bef_df[geoid_column]]
+        bef_df.drop(columns=[geoid_column], inplace=True)
 
 
 def merge_block_equivalence_files(chamber: str, directory: str, source_plan: int, diff_plan: int) -> tuple[
     pd.DataFrame, int]:
-    source_bef_df = load_block_equivalency_file(build_plan_path(chamber, directory, source_plan))
-    diff_bef_df = load_block_equivalency_file(build_plan_raw_path(chamber, directory, diff_plan))
-    source_bef_df.set_index([SCTBKEY_COLUMN], inplace=True)
-    diff_bef_df.set_index([SCTBKEY_COLUMN], inplace=True)
-    joined_source_bef_df = source_bef_df.join(diff_bef_df, how='inner', on=SCTBKEY_COLUMN, lsuffix='_source',
+    geoid_column, district_column = build_plan_columns(chamber)
+    source_bef_df = load_block_equivalency_file(chamber, directory, source_plan)
+    diff_bef_df = load_block_equivalency_file_from_path(chamber, build_plan_raw_path(chamber, directory, diff_plan))
+    source_bef_df.set_index([geoid_column], inplace=True)
+    diff_bef_df.set_index([geoid_column], inplace=True)
+    joined_source_bef_df = source_bef_df.join(diff_bef_df, how='inner', on=geoid_column, lsuffix='_source',
                                               rsuffix='_diff')
-    joined_source_bef_df[DISTRICT_COLUMN] = [x if y == 0 else y for x, y in
-                                             zip(joined_source_bef_df['DISTRICT_source'],
-                                                 joined_source_bef_df['DISTRICT_diff'])]
+    joined_source_bef_df[district_column] = [x if y == 0 else y for x, y in
+                                             zip(joined_source_bef_df[f'{district_column}_source'],
+                                                 joined_source_bef_df[f'{district_column}_diff'])]
     changed_rows = [not x == y for x, y in
-                    zip(joined_source_bef_df[DISTRICT_COLUMN], joined_source_bef_df['DISTRICT_source'])]
+                    zip(joined_source_bef_df[district_column], joined_source_bef_df[f'{district_column}_source'])]
     number_changed_rows = sum(changed_rows)
     print(f"Merged: {source_plan} {diff_plan}  Changed Rows: {number_changed_rows}")
-    joined_source_bef_df.drop(columns=['DISTRICT_source', 'DISTRICT_diff'], inplace=True)
+    joined_source_bef_df.drop(columns=[f'{district_column}_source', f'{district_column}_diff'], inplace=True)
     return joined_source_bef_df, number_changed_rows
 
 
 def compare_block_equivalence_files(chamber: str, directory: str, source_plan: int, target_plan: int) -> int:
-    source_bef_df = load_block_equivalency_file(build_plan_path(chamber, directory, source_plan))
-    target_bef_df = load_block_equivalency_file(build_plan_path(chamber, directory, target_plan))
-    source_bef_df.set_index([SCTBKEY_COLUMN], inplace=True)
-    target_bef_df.set_index([SCTBKEY_COLUMN], inplace=True)
-    joined_source_bef_df = source_bef_df.join(target_bef_df, how='inner', on=SCTBKEY_COLUMN, lsuffix='_source',
+    source_bef_df = load_block_equivalency_file(chamber, directory, source_plan)
+    target_bef_df = load_block_equivalency_file(chamber, directory, target_plan)
+
+    geoid_column, district_column = build_plan_columns(chamber)
+    source_bef_df.set_index([geoid_column], inplace=True)
+    target_bef_df.set_index([geoid_column], inplace=True)
+    joined_source_bef_df = source_bef_df.join(target_bef_df, how='inner', on=geoid_column, lsuffix='_source',
                                               rsuffix='_target')
-    joined_source_bef_df[DISTRICT_COLUMN] = [x if y == 0 else y for x, y in
-                                             zip(joined_source_bef_df['DISTRICT_source'],
-                                                 joined_source_bef_df['DISTRICT_target'])]
+    joined_source_bef_df[district_column] = [x if y == 0 else y for x, y in
+                                             zip(joined_source_bef_df[f'{district_column}_source'],
+                                                 joined_source_bef_df[f'{district_column}_target'])]
     changed_rows = [not x == y for x, y in
-                    zip(joined_source_bef_df[DISTRICT_COLUMN], joined_source_bef_df['DISTRICT_source'])]
+                    zip(joined_source_bef_df[district_column], joined_source_bef_df[f'{district_column}_source'])]
 
     return sum(changed_rows)
 
@@ -150,14 +172,25 @@ def save_merged_plans(chamber: str, directory: str, source_plan: int, diff_plan:
 
 
 def load_proposed_plan(chamber: str, directory: str, plan: int) -> np.ndarray:
-    bef_df = load_block_equivalency_file(build_plan_path(chamber, directory, plan))
-    bef_df.sort_values(by=SCTBKEY_COLUMN, inplace=True)
-    return bef_df[DISTRICT_COLUMN].to_numpy()
+    bef_df = load_block_equivalency_file(chamber, directory, plan)
+    return build_proposed_plan_from_dataframe(chamber, bef_df)
+
+
+def build_proposed_plan_from_dataframe(chamber: str, bef_df: pd.DataFrame) -> np.ndarray:
+    geoid_column, district_column = build_plan_columns(chamber)
+    return build_proposed_plan_vector(bef_df, geoid_column, district_column)
+
+
+def build_proposed_plan_vector(bef_df: pd.DataFrame, geoid_column: str, data_column: str) -> np.ndarray:
+    bef_df.sort_values(by=geoid_column, inplace=True)
+    return bef_df[data_column].to_numpy()
 
 
 def save_plan_data(chamber: str, directory: str, plan: int) -> None:
-    bef_df = load_block_equivalency_file(build_plan_path(chamber, directory, plan))
-    normalize_block_equivalency_df(bef_df)
+    bef_df = load_block_equivalency_file(chamber, directory, plan)
+    normalize_block_equivalency_df(chamber, bef_df)
+    print(f"BEF Data: {len(bef_df)}")
+    print(bef_df.head())
 
     data_filtered_path = build_data_filtered_path(chamber, directory, 'parquet')
     data_df = pd.read_parquet(data_filtered_path)
@@ -168,23 +201,24 @@ def save_plan_data(chamber: str, directory: str, plan: int) -> None:
     data_df.set_index(['geoid'], inplace=True)
     joined_df = bef_df.join(data_df, how='inner', on='geoid')
     if not len(joined_df) == len(bef_df):
-        raise RuntimeError("Invalid Length")
+        error = f"Invalid Lengths BEF: {len(bef_df)} Joined: {len(joined_df)}"
+        raise RuntimeError(error)
 
-    joined_path_prefix = \
-        build_redistricting_data_calculated_directory(directory) + \
-        'redistricting_data_nodes_TX_nodes_TX_2020_tabblock_' + \
-        chamber + '_filtered_' + str(plan)
+    joined_path_prefix = build_redistricting_data_calculated_directory(directory) + \
+                         'redistricting_data_nodes_TX_nodes_TX_2020_tabblock_' + chamber + '_filtered_' + str(plan)
     joined_path_parquet = joined_path_prefix + '.parquet'
     joined_df.to_parquet(joined_path_parquet)
-    joined_df.to_csv(joined_path_prefix + ".csv")
+    joined_df.to_csv(joined_path_prefix + '.csv')
 
-    bq_chamber_name = dt.get_census_chamber_name(chamber)
-    joined_df.drop(columns=['county', bq_chamber_name], inplace=True)
-    joined_df[DISTRICT_COLUMN] = joined_df[DISTRICT_COLUMN].astype(str)
-    grouped_by_district = joined_df.groupby(DISTRICT_COLUMN)
+    columns_to_drop = ['county'] + ([dt.get_census_chamber_name(chamber)] if chamber in cm.CHAMBERS else [])
+    joined_df.drop(columns=columns_to_drop, inplace=True)
+
+    _, district_column = build_plan_columns(chamber)
+    joined_df[district_column] = joined_df[district_column].astype(str)
+    grouped_by_district = joined_df.groupby(district_column)
 
     plan_df = grouped_by_district.sum()
-    plan_df.sort_values(DISTRICT_COLUMN, ascending=True, inplace=True)
+    plan_df.sort_values(district_column, ascending=True, inplace=True)
     print(f"{len(plan_df)}")
 
     plan_df.to_parquet(build_plan_data_path(chamber, directory, plan, 'parquet'))
@@ -233,7 +267,7 @@ def build_statistics_vector_settings() -> list[tuple[str, Callable[[pd.DataFrame
         (dt.build_election_filename_csv('PRES20', 'vector'), pres20_percent_vector),
         (dt.build_election_filename_csv('SEN20', 'vector'), sen20_percent_vector),
         ('o17_pop_vector.csv', dt.o17_pop),
-        ('total_pop.csv', dt.total_pop)
+        ('total_pop_vector.csv', dt.total_pop)
     ]
 
 
@@ -245,10 +279,12 @@ def save_vector_file(chamber: str, df: pd.DataFrame, path: str,
     max_district = max(districts)
     print(f"Districts: {number_districts} {max_district}")
     if not number_districts == max_district:
-        raise RuntimeError(f'max district does not match number of districts in: {path}')
+        error = f'max district does not match number of districts in: {path}'
+        raise RuntimeError(error)
 
     if max_district not in cm.get_allowed_number_districts(chamber):
-        raise RuntimeError(f'max district is not an allowed number of districts: {path}')
+        error = f'max district is not an allowed number of districts: {path}'
+        raise RuntimeError(error)
 
     statistics_lookup = {x: y for x, y in zip(df['district'], statistic_func(df))}
     statistics_list = [statistics_lookup[str(x)] for x in range(1, max_district + 1)]
@@ -270,15 +306,15 @@ def save_plan_vectors(chamber: str, directory: str, plan: int) -> None:
 
 
 def build_plan_vectors_directory(chamber: str, directory: str, plan: int) -> str:
-    return f'{directory}plan_vectors/vectors_PLAN{cm.encode_chamber_character(chamber)}{plan}/'
+    return f'{directory}plan_vectors/vectors_PLAN{cm.encode_chamber(chamber)}{plan}/'
 
 
 def get_known_plans(chamber: str, plans_raw_directory: str) -> set[int]:
     plans = set()
-    for path in glob.glob(f'{plans_raw_directory}plan{cm.encode_chamber_character(chamber)}*_blk.zip'):
+    for path in glob.glob(f'{plans_raw_directory}plan{cm.encode_chamber(chamber)}*_blk.zip'):
         path = os.path.normpath(path)
         plan_string = str(path.replace(os.path.dirname(path), '').removesuffix('_blk.zip')[1:]). \
-            removeprefix(f'plan{cm.encode_chamber_character(chamber).lower()}')
+            removeprefix(f'plan{cm.encode_chamber(chamber).lower()}')
         plans.add(int(plan_string))
     return plans
 
@@ -287,6 +323,8 @@ def save_current_merged_plans(chamber: str, directory: str, plans_metadata: pd.D
     plans_directory = build_plans_directory(directory)
     cm.ensure_directory_exists(plans_directory)
 
+    reference_plan = None
+    _, district_column = build_plan_columns(chamber)
     for plan_metadata in plans_metadata.itertuples():
         plan = plan_metadata.plan
         previous_plan = plan_metadata.previous_plan
@@ -294,13 +332,45 @@ def save_current_merged_plans(chamber: str, directory: str, plans_metadata: pd.D
         if force or not os.path.exists(plan_path):
             print(f'Merging Plan: {plan}')
             if previous_plan == 0:
-                diff_bef_df = load_block_equivalency_file(build_plan_raw_path(chamber, directory, plan))
-                if any(diff_bef_df[DISTRICT_COLUMN] == 0):
+                bef_df = load_block_equivalency_file_from_path(chamber, build_plan_raw_path(chamber, directory, plan))
+                if chamber in cm.CHAMBERS and any(bef_df[district_column] == 0):
                     print(f"INVALID PLAN {plan}")
                     plans_metadata.at[plan, 'invalid'] = 1
                     save_plans_metadata(chamber, build_plans_directory(directory), plans_metadata)
+                elif chamber == 'DCN':
+                    if reference_plan is None:
+                        original_plan = cm.determine_original_plan(chamber)
+                        assert original_plan is not None
+                        original_bef = load_block_equivalency_file_from_path(
+                            chamber,
+                            build_plan_raw_path(chamber, directory, original_plan))
+                        redistricting_data = sa.load_redistricting_data(directory)
+                        geoid_column, _ = build_plan_columns(chamber)
+                        original_geoids = set(original_bef[geoid_column])
 
-                copy2(build_plan_raw_path(chamber, directory, plan), plan_path)
+                    plan_geoids = set(bef_df[geoid_column])
+                    common_geoids = original_geoids.intersection(plan_geoids)
+
+                    common_geoids_trimmed = set(map(lambda x: x[2:], common_geoids))
+                    common_redistricting_data = redistricting_data[
+                        redistricting_data['geoid'].isin(common_geoids_trimmed)].copy()
+                    print(f'{len(common_geoids_trimmed)} {len(common_redistricting_data)}')
+                    node_weights = build_proposed_plan_vector(common_redistricting_data, 'geoid', 'total_pop')
+
+                    filtered_original_bef = original_bef[original_bef[geoid_column].isin(common_geoids)]
+                    reference_plan = 1 + build_proposed_plan_from_dataframe(chamber, filtered_original_bef)
+                    filtered_bef_def = bef_df[bef_df[geoid_column].isin(common_geoids)]
+                    plan_array = 1 + build_proposed_plan_from_dataframe(chamber, filtered_bef_def)
+                    print(f'Reference {len(reference_plan)} {len(plan_array)}')
+
+                    intersection_sizes = pa.calculate_intersection_sizes(reference_plan, plan_array, node_weights,
+                                                                         'uint')
+                    matching = pa.calculate_matching(intersection_sizes.toarray())
+                    non_trivial_mappings = {x + 1: y for x, y in enumerate(matching) if (x + 1) != y}
+                    print(f"Matching Map: {non_trivial_mappings}")
+                    bef_df[district_column] = bef_df[district_column].apply(lambda x: matching[x])
+
+                bef_df.to_csv(plan_path, index=False)
             else:
                 save_merged_plans(chamber, directory, previous_plan, plan, plans_metadata)
 
@@ -380,8 +450,7 @@ def get_valid_plans(chamber: str, plans_directory: str) -> set[int]:
 
 def update_plan_vectors(chamber: str, directory: str) -> None:
     save_current_plan_vectors(chamber, directory)
-    if False:
-        save_plan_vectors_summaries(chamber, directory)
+    save_plan_vectors_summaries(chamber, directory)
 
 
 def build_graph_path(chamber: str, directory: str) -> str:
@@ -513,8 +582,8 @@ def build_party_lookup(directory: str) -> dict[str, dict[str, str]]:
 
 
 def analyze_bef_assignments(chamber: str, directory: str, plan: int) -> None:
-    bef_df = load_block_equivalency_file(build_plan_path(chamber, directory, plan))
-    normalize_block_equivalency_df(bef_df)
+    bef_df = load_block_equivalency_file(chamber, directory, plan)
+    normalize_block_equivalency_df(chamber, bef_df)
 
     assignments_df = pd.read_parquet(build_redistricting_data_directory(directory) +
                                      'redistricting_data_assignments_TX_assignments_TX_2020.parquet')
@@ -589,8 +658,7 @@ def verify_graph(chamber: str, directory: str, plan: int) -> None:
 
 
 def load_nodes_raw_filtered(directory: str) -> pd.DataFrame:
-    filtered_filename = 'nodes_raw_filtered.parquet'
-    filtered_path = build_redistricting_data_calculated_directory(directory) + filtered_filename
+    filtered_path = f'{build_redistricting_data_calculated_directory(directory)}nodes_raw_filtered.parquet'
     if not os.path.exists(filtered_path):
         with Timer(name='load_nodes_raw_filtered'):
             node_data = pd.read_parquet(build_redistricting_data_directory(directory) +
@@ -629,7 +697,8 @@ def build_final_plan(chamber: str) -> int:
     return {
         'USCD': 2193,
         'TXHD': 2316,
-        'TXSN': 2168
+        'TXSN': 2168,
+        'DCN': 90091
     }[chamber]
 
 
@@ -640,15 +709,9 @@ if __name__ == '__main__':
         t = Timer()
         t.start()
 
-        chamber = 'TXSN'  # 'USCD'  #  'TXHD'  #
+        chamber = 'DCN'  # 'USCD'  #  'TXHD'  #
         root_directory = 'G:/rob/projects/election/rob/'
         plans_directory = build_plans_directory(root_directory)
-
-        if True:
-            # process_tabblock_data(chamber, root_directory)
-            for chamber in cm.CHAMBERS:
-                print(f"Chamber: {chamber}")
-                update_plan_vectors(chamber, root_directory)
 
         if False:
             pd.set_option('display.width', 500)
@@ -659,15 +722,20 @@ if __name__ == '__main__':
             # analyze_proposed_plan_seed_assignments_v2(chamber, root_directory, plan)
             verify_graph(chamber, root_directory, plan)
 
-        if False:
+        if True:
             plans_metadata = load_plans_metadata(chamber, plans_directory)
-            save_current_merged_plans(chamber, root_directory, plans_metadata, force=True)
+            save_current_merged_plans(chamber, root_directory, plans_metadata, force=False)
+
+        if True:
+            # process_tabblock_data(chamber, root_directory)
+            for chamber in ['DCN']:  # cm.CHAMBERS:
+                print(f"Chamber: {chamber}")
+                update_plan_vectors(chamber, root_directory)
 
         if False:
             for chamber in cm.CHAMBERS:  # ['USCD']:  #
                 proposed_plans_metadata = load_plans_metadata(chamber, plans_directory)
                 save_graph_filtered(chamber, root_directory, proposed_plans_metadata)
-            # pylab.show()
 
         if False:
             save_plan_vectors(chamber, root_directory, 2101)

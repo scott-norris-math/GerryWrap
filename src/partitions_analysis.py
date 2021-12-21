@@ -57,31 +57,7 @@ def calculate_intersection_sizes(plan1: np.ndarray, plan2: np.ndarray, node_weig
     return scipy.sparse.csr_matrix((values, (row, col)), shape=(number_parts, number_parts))
 
 
-def build_intersection_sizes_dictionary_path(analysis_directory: str, suffix: str = '') -> str:
-    return f'{analysis_directory}intersection_sizes_dictionary{cm.build_suffix(suffix)}.npz'
-
-
-def build_intersection_sizes_path(analysis_directory: str, suffix: str = '') -> str:
-    return f'{analysis_directory}intersection_sizes{cm.build_suffix(suffix)}.npz'
-
-
-def build_matchings_path(analysis_directory: str, suffix: str = '') -> str:
-    return f'{analysis_directory}matchings{cm.build_suffix(suffix)}.npz'
-
-
-def build_matched_intersection_sizes_path(analysis_directory: str, suffix: str = '') -> str:
-    return f'{analysis_directory}matched_intersection_sizes{cm.build_suffix(suffix)}.npz'
-
-
-def build_symmetric_difference_sizes_path(analysis_directory: str, suffix: str = '') -> str:
-    return f'{analysis_directory}symmetric_difference_sizes{cm.build_suffix(suffix)}.npz'
-
-
-def build_matched_plan_sizes_path(analysis_directory: str, suffix: str = '') -> str:
-    return f'{analysis_directory}matched_plan_sizes{cm.build_suffix(suffix)}.npz'
-
-
-def save_intersection_sizes(analysis_directory: str, reference_plan: np.ndarray, plans: np.ndarray,
+def save_intersection_sizes(ensemble_directory: str, reference_plan: np.ndarray, plans: np.ndarray,
                             node_weights: np.ndarray, value_type: str, suffix: str = '') -> None:
     number_plans = len(plans)
     intersection_sizes = np.ndarray(number_plans, dtype='object')
@@ -89,11 +65,11 @@ def save_intersection_sizes(analysis_directory: str, reference_plan: np.ndarray,
         if x % 1000 == 0:
             print(x)
         intersection_sizes[x] = calculate_intersection_sizes(reference_plan, plans[x], node_weights, value_type)
-    np.savez_compressed(build_intersection_sizes_path(analysis_directory, suffix), intersection_sizes)
+    np.savez_compressed(build_intersection_sizes_path(ensemble_directory, suffix), intersection_sizes)
 
 
-def load_intersection_sizes(analysis_directory: str, suffix: str = '') -> np.ndarray:
-    path = build_intersection_sizes_path(analysis_directory, suffix)
+def load_intersection_sizes(ensemble_directory: str, suffix: str = '') -> np.ndarray:
+    path = build_intersection_sizes_path(ensemble_directory, suffix)
     return np.load(path, allow_pickle=True)['arr_0']
 
 
@@ -148,7 +124,7 @@ def transform_sparse_matrix_to_dict(matrix: np.ndarray) -> dict[tuple[int, int],
     return transformed
 
 
-def save_matchings(analysis_directory: str, intersection_sizes: np.ndarray, suffix: str = '') -> None:
+def save_matchings(ensemble_directory: str, intersection_sizes: np.ndarray, suffix: str = '') -> None:
     number_plans = len(intersection_sizes)
     number_parts, _ = np.shape(intersection_sizes[0])
     matchings = np.ndarray((number_plans, number_parts), dtype='uint8')
@@ -156,15 +132,15 @@ def save_matchings(analysis_directory: str, intersection_sizes: np.ndarray, suff
         if x % 1000 == 0:
             print(x)
         matchings[x] = calculate_matching(intersection_sizes[x].toarray())
-    np.savez_compressed(build_matchings_path(analysis_directory, suffix), matchings)
+    np.savez_compressed(build_matchings_path(ensemble_directory, suffix), matchings)
 
 
-def load_matchings(analysis_directory: str, suffix: str = '') -> np.ndarray:
-    path = build_matchings_path(analysis_directory, suffix)
+def load_matchings(ensemble_directory: str, suffix: str = '') -> np.ndarray:
+    path = build_matchings_path(ensemble_directory, suffix)
     return cm.load_numpy_compressed(path)
 
 
-def save_matched_intersection_sizes(analysis_directory: str, matchings: np.ndarray, intersection_sizes: np.ndarray,
+def save_matched_intersection_sizes(ensemble_directory: str, matchings: np.ndarray, intersection_sizes: np.ndarray,
                                     value_type: str, suffix: str = '') -> None:
     number_plans = len(matchings)
     number_parts = len(matchings[0])
@@ -186,11 +162,11 @@ def save_matched_intersection_sizes(analysis_directory: str, matchings: np.ndarr
             values[j] = n
         matched_intersections_sizes[i] = scipy.sparse.csr_matrix((values, (row, col)),
                                                                  shape=(number_parts, number_parts))
-    np.savez_compressed(build_matched_intersection_sizes_path(analysis_directory, suffix), matched_intersections_sizes)
+    np.savez_compressed(build_matched_intersection_sizes_path(ensemble_directory, suffix), matched_intersections_sizes)
 
 
-def load_matched_intersection_sizes(analysis_directory: str, suffix: str = '') -> np.ndarray:
-    path = build_matched_intersection_sizes_path(analysis_directory, suffix)
+def load_matched_intersection_sizes(ensemble_directory: str, suffix: str = '') -> np.ndarray:
+    path = build_matched_intersection_sizes_path(ensemble_directory, suffix)
     return np.load(path, allow_pickle=True)['arr_0']
 
 
@@ -198,7 +174,7 @@ def calculate_number_intersections(intersection_sizes: np.ndarray) -> int:
     return np.trace(intersection_sizes)
 
 
-def save_matched_plan_sizes(analysis_directory: str, matched_intersection_sizes: np.ndarray,
+def save_matched_plan_sizes(ensemble_directory: str, matched_intersection_sizes: np.ndarray,
                             value_type: str, suffix: str = '') -> None:
     number_plans = len(matched_intersection_sizes)
     number_parts, _ = np.shape(matched_intersection_sizes[0].todense())
@@ -209,11 +185,11 @@ def save_matched_plan_sizes(analysis_directory: str, matched_intersection_sizes:
 
         matrix = sparse_matrix.todense()
         matched_plan_sizes[i] = np.array([np.sum(x) for x in matrix], dtype=value_type)
-    np.savez_compressed(build_matched_plan_sizes_path(analysis_directory, suffix), matched_plan_sizes)
+    np.savez_compressed(build_matched_plan_sizes_path(ensemble_directory, suffix), matched_plan_sizes)
 
 
-def load_matched_plan_sizes(analysis_directory: str, suffix: str = '') -> np.ndarray:
-    path = build_matched_plan_sizes_path(analysis_directory, suffix)
+def load_matched_plan_sizes(ensemble_directory: str, suffix: str = '') -> np.ndarray:
+    path = build_matched_plan_sizes_path(ensemble_directory, suffix)
     return np.load(path)['arr_0']
 
 
@@ -230,13 +206,13 @@ def calculate_symmetric_difference_sizes(matched_intersections_sizes: np.ndarray
     return symmetric_difference_sizes
 
 
-def save_symmetric_difference_sizes(analysis_directory: str, symmetric_difference_sizes: np.ndarray,
+def save_symmetric_difference_sizes(ensemble_directory: str, symmetric_difference_sizes: np.ndarray,
                                     suffix: str = '') -> None:
-    np.savez_compressed(build_symmetric_difference_sizes_path(analysis_directory, suffix), symmetric_difference_sizes)
+    np.savez_compressed(build_symmetric_difference_sizes_path(ensemble_directory, suffix), symmetric_difference_sizes)
 
 
-def load_symmetric_difference_sizes(analysis_directory: str, suffix: str = '') -> np.ndarray:
-    path = build_symmetric_difference_sizes_path(analysis_directory, suffix)
+def load_symmetric_difference_sizes(ensemble_directory: str, suffix: str = '') -> np.ndarray:
+    path = build_symmetric_difference_sizes_path(ensemble_directory, suffix)
     return np.load(path)['arr_0']
 
 
@@ -329,49 +305,78 @@ def build_vector(graph: nx.Graph, column: str) -> np.array:
     return np.array([y for _, y in sorted(data, key=lambda x: x[0])])
 
 
+def save_matching_files(chamber: str, directory: str, suffix: str) -> None:
+    settings = cm.build_settings(chamber)
+    ensemble_directory = cm.build_ensemble_directory(directory, settings.ensemble_description)
+
+    # plans = cm.load_plans_from_path(f'{ensemble_directory}unique_plans.npz')
+    plans = cm.load_plans_from_files(directory, settings.ensemble_description, range(0, settings.number_files))
+
+    if chamber in cm.CHAMBERS:
+        plan = pp.build_final_plan(chamber)
+        census_chamber_name = dt.get_census_chamber_name(chamber)
+        graph = si.load_plan_seed_with_data(chamber, directory, plan, [census_chamber_name])
+        reference_plan = np.array([int(x) for x in build_vector(graph, census_chamber_name)])
+    else:
+        seeds_directory = cm.build_seeds_directory(directory)
+        graph = nx.read_gpickle(seeds_directory + settings.dual_graph_filename)
+        reference_plan = plans[0]
+
+    node_weights = build_vector(graph, 'total_pop')
+    value_type = 'uint'
+
+    save_intersection_sizes(ensemble_directory, reference_plan, plans, node_weights, value_type, suffix)
+    intersection_sizes = load_intersection_sizes(ensemble_directory, suffix)
+
+    save_matchings(ensemble_directory, intersection_sizes, suffix)
+    matchings = load_matchings(ensemble_directory, suffix)
+
+    save_matched_intersection_sizes(ensemble_directory, matchings, intersection_sizes, value_type, suffix)
+    matched_intersections_sizes = load_matched_intersection_sizes(ensemble_directory, suffix)
+
+    symmetric_difference_sizes = calculate_symmetric_difference_sizes(matched_intersections_sizes)
+    save_symmetric_difference_sizes(ensemble_directory, symmetric_difference_sizes, suffix)
+
+    save_matched_plan_sizes(ensemble_directory, matched_intersections_sizes, value_type, suffix)
+
+
+def build_intersection_sizes_dictionary_path(ensemble_directory: str, suffix: str = '') -> str:
+    return f'{ensemble_directory}intersection_sizes_dictionary{cm.build_suffix(suffix)}.npz'
+
+
+def build_intersection_sizes_path(ensemble_directory: str, suffix: str = '') -> str:
+    return f'{ensemble_directory}intersection_sizes{cm.build_suffix(suffix)}.npz'
+
+
+def build_matchings_path(ensemble_directory: str, suffix: str = '') -> str:
+    return f'{ensemble_directory}matchings{cm.build_suffix(suffix)}.npz'
+
+
+def build_matched_intersection_sizes_path(ensemble_directory: str, suffix: str = '') -> str:
+    return f'{ensemble_directory}matched_intersection_sizes{cm.build_suffix(suffix)}.npz'
+
+
+def build_symmetric_difference_sizes_path(ensemble_directory: str, suffix: str = '') -> str:
+    return f'{ensemble_directory}symmetric_difference_sizes{cm.build_suffix(suffix)}.npz'
+
+
+def build_matched_plan_sizes_path(ensemble_directory: str, suffix: str = '') -> str:
+    return f'{ensemble_directory}matched_plan_sizes{cm.build_suffix(suffix)}.npz'
+
+
 if __name__ == '__main__':
     def main() -> None:
         directory = 'G:/rob/projects/election/rob/'
 
         if True:
-            ensemble_description = 'TXSN_random_seed_2'
-            ensemble_directory = cm.build_ensemble_directory(directory, ensemble_description)
-            analysis_directory = f'{ensemble_directory}analysis/'
-            cm.ensure_directory_exists(analysis_directory)
+            chamber = 'DCN'
+            suffix = 'total_pop'
+            save_matching_files(chamber, directory, suffix)
 
-            plans = cm.load_plans_from_path(f'{ensemble_directory}unique_plans.npz')
+            settings = cm.build_settings(chamber)
+            ensemble_directory = cm.build_ensemble_directory(directory, settings.ensemble_description)
 
-            # seeds_directory = cm.build_seeds_directory(directory)
-            # settings = cm.build_TXSN_random_seed_simulation_settings()
-            # dual_graph = nx.read_gpickle(seeds_directory + settings.dual_graph_filename)
-
-            chamber = 'TXSN'
-            plan = pp.build_final_plan(chamber)
-            census_chamber_name = dt.get_census_chamber_name(chamber)
-            graph = si.load_plan_seed_with_data(chamber, directory, plan, [census_chamber_name])
-
-            node_weights = build_vector(graph, 'total_pop')
-
-            reference_plan = np.array([int(x) for x in build_vector(graph, census_chamber_name)])
-            print(reference_plan)
-            #reference_plan = plans[100000]
-
-            value_type = 'uint'
-            suffix = 'total_pop_2100'
-            # save_intersection_sizes(analysis_directory, reference_plan, plans, node_weights, value_type, suffix)
-            intersection_sizes = load_intersection_sizes(analysis_directory, suffix)
-
-            # save_matchings(analysis_directory, intersection_sizes, suffix)
-            matchings = load_matchings(analysis_directory, suffix)
-
-            # save_matched_intersection_sizes(analysis_directory, matchings, intersection_sizes, value_type, suffix)
-            matched_intersections_sizes = load_matched_intersection_sizes(analysis_directory, suffix)
-
-            symmetric_difference_sizes = calculate_symmetric_difference_sizes(matched_intersections_sizes)
-            save_symmetric_difference_sizes(analysis_directory, symmetric_difference_sizes, suffix)
-
-            save_matched_plan_sizes(analysis_directory, matched_intersections_sizes, value_type, suffix)
-            matched_plan_sizes = load_matched_plan_sizes(analysis_directory, suffix)
+            matched_plan_sizes = load_matched_plan_sizes(ensemble_directory, suffix)
 
             plt.plot(distances)
             plt.show()

@@ -14,6 +14,7 @@ from shapely import wkt
 from shapely.geometry.base import BaseGeometry
 from shapely.geometry.polygon import Polygon
 from shapely.geometry.multipolygon import MultiPolygon
+import statistics
 from typing import Iterable, Any, Optional
 
 import common as cm
@@ -25,6 +26,7 @@ import simulation as si
 from timer import Timer
 
 
+FAST_PLOTTING = False
 BLACK = 'k'
 
 
@@ -32,7 +34,8 @@ def get_chamber_pretty_name(chamber: str) -> str:
     return {
         'USCD': "US Congress",
         'TXSN': "Texas Senate",
-        'TXHD': "Texas House"
+        'TXHD': "Texas House",
+        'DCN': "Dallas City Council"
     }[chamber]
 
 
@@ -58,7 +61,7 @@ def get_racial_group_pretty_name(group: str) -> str:
 
 
 def get_racial_groups() -> list[str]:
-    return ['BVAP', 'HVAP', 'BHVAP', 'NWVAP']
+    return ['BVAP', 'HVAP', 'BHVAP', 'NWVAP', 'WVAP']
 
 
 def get_racial_group_fill_color(group: str) -> str:
@@ -72,7 +75,7 @@ def get_racial_group_fill_color(group: str) -> str:
 
 
 def build_plan_label(chamber, plan) -> str:
-    return f"Proposed {cm.encode_chamber_character(chamber)}{plan}"
+    return f"Proposed {cm.encode_chamber(chamber)}{plan}"
 
 
 def save_election_plots(chamber: str, root_directory: str, ensemble_directory: str, plots_directory: str,
@@ -87,11 +90,10 @@ def save_election_plots(chamber: str, root_directory: str, ensemble_directory: s
         plans = ([] if current_plan is None else [current_plan]) + comparison_plans
         plan_vectors = cm.load_plan_vectors(chamber, root_directory, statistic_name, plans)
 
-        partisan_metrics_figure_point = None
-        for comparison_plan in comparison_plans:
-            print(comparison_plan)
+        if True:
+            for comparison_plan in comparison_plans:
+                print(comparison_plan)
 
-            if True:
                 current_plan_override = None if chamber == 'USCD' else current_plan
 
                 save_seats_voteshares_ensemble_comps_plot(chamber, plots_directory, election,
@@ -104,15 +106,25 @@ def save_election_plots(chamber: str, root_directory: str, ensemble_directory: s
                                                comparison_plan, plan_vectors)
                 save_mean_median_partisan_bias_plot(chamber, plots_directory, election, ensemble_matrix_transposed,
                                                     comparison_plan, plan_vectors)
+                clear_plots()
 
-            if True:
+        if True:
+            partisan_metrics_figure_point = None
+            for comparison_plan in comparison_plans:
+                print(comparison_plan)
                 comparison_label = build_plan_label(chamber, comparison_plan)
+                number_plans = 10000 if FAST_PLOTTING else 1000000
                 partisan_metrics_figure, partisan_metrics_point = \
                     gw.partisan_metrics_hist2D(ensemble_matrix, plan_vectors[comparison_plan], comparison_label,
-                                               None, partisan_metrics_figure_point)
+                                               number_plans, partisan_metrics_figure_point)
                 partisan_metrics_figure_point = partisan_metrics_figure, partisan_metrics_point
                 partisan_metrics_figure.savefig(
                     f'{plots_directory}partisan-metrics-2D-{chamber}-{comparison_plan}-{election}.pdf')
+
+            partisan_metrics_point.remove()
+
+            if 'DCN':
+                gw.partisan_metrics_hist2D_all(ensemble_matrix, plan_vectors, {76160, 90091, 77286})
 
             clear_plots()
 
@@ -210,7 +222,7 @@ def save_violin_comparison_plots(chamber: str, ensemble_matrix: np.ndarray, curr
 
     if comparison_plan is not None:
         plan_legend_names = plan_legend_names.copy()
-        plan_legend_names[-1] = plan_legend_names[-1] + f' {cm.encode_chamber_character(chamber)}{comparison_plan}'
+        plan_legend_names[-1] = plan_legend_names[-1] + f' {cm.encode_chamber(chamber)}{comparison_plan}'
 
     return gw.vote_vector_ensemble_comps(ensemble_matrix, plot_title, pc_thresh=.01, have_actual=False,
                                          comp_plans=True, comp_plans_vv=comparison_plans,
@@ -266,7 +278,7 @@ def save_racial_plots(chamber: str, root_directory: str, ensemble_directory: str
                                                 current_plan, comparison_plan, plan_vectors, plan_pnums,
                                                 plan_legend_names, plan_colors)
 
-            if True:
+            if False:
                 save_racial_histograms(chamber, plots_directory, racial_group, ensemble_matrix,
                                        current_plan, comparison_plan, plan_vectors, plan_legend_names, plan_colors,
                                        True)
@@ -322,7 +334,7 @@ def save_racial_histograms(chamber: str, output_directory: str, group: str, ense
 
     if comparison_plan is not None:
         plan_legend_names = plan_legend_names.copy()
-        plan_legend_names[-1] = plan_legend_names[-1] + f' {cm.encode_chamber_character(chamber)}{comparison_plan}'
+        plan_legend_names[-1] = plan_legend_names[-1] + f' {cm.encode_chamber(chamber)}{comparison_plan}'
 
     group_fill_color = get_racial_group_fill_color(group)
     for x in perc_thresh:
@@ -359,11 +371,11 @@ def save_plots(chamber: str, root_directory: str, seed_description: str, ensembl
         save_election_plots(chamber, root_directory, ensemble_directory, plots_directory, current_plan,
                             comparison_plans, plan_pnums, plan_legend_names, plan_colors)
 
-    if False:
+    if True:
         save_racial_plots(chamber, root_directory, ensemble_directory, plots_directory, current_plan, comparison_plans,
                           plan_pnums, plan_legend_names, plan_colors)
 
-    if True:
+    if False:
         save_election_racial_plots(chamber, root_directory, ensemble_directory, plots_directory, current_plan,
                                    comparison_plans, True, True, False)  # False, False, True)  # True, False, False)  #
 
@@ -393,7 +405,7 @@ def save_election_racial_plots(chamber: str, root_directory: str, ensemble_direc
                 print(f"Plan: {comparison_plan}")
                 title = get_chamber_pretty_name(chamber) + '  (' + get_racial_group_pretty_name(
                     racial_group) + ' - ' + get_election_pretty_name(election) + ')'
-                number_points = 5000000
+                number_points = 100000 if FAST_PLOTTING else 5000000
                 with Timer(name='racial_vs_political'):
                     figure, previous_axes_points_annotations = \
                         gw.racial_vs_political_deviations(ensemble_matrix_election,
@@ -407,6 +419,7 @@ def save_election_racial_plots(chamber: str, root_directory: str, ensemble_direc
                 infix += f'-with-ensemble{sorted_string}' if display_ensemble else ''
                 figure.savefig(
                     f'{plots_directory}racial-political-deviations{infix}-{chamber}-{comparison_plan}-{election}-{racial_group}.pdf')
+
             clear_plots()
 
 
@@ -469,13 +482,7 @@ def save_plan_map(chamber: str, partition: GeographicPartition, coloring_assignm
                   district_text_colors: Optional[dict[int, int]], output_path_prefix: str) -> None:
     set_figure_size(chamber)
 
-    colored_partition = GeographicPartition(partition.graph, assignment=coloring_assignment, updaters=[])
-    colored_partition.plot(cmap='CustomStacked', linewidth=.1, edgecolor='0.8',
-                           vmax=20)  # number colors in colmormap - 1
-
-    district_geometries = build_district_geometries(partition.graph, partition.assignment)
-    plot_boundaries(district_geometries.values())
-    plot_district_numbers(district_geometries, district_text_colors, None)
+    plot_map_impl(partition, coloring_assignment, district_text_colors)
 
     plt.tight_layout()
     plt.savefig(f'{output_path_prefix}.pdf')
@@ -484,9 +491,26 @@ def save_plan_map(chamber: str, partition: GeographicPartition, coloring_assignm
     reset_rcParams()
 
 
+def plot_map(partition: GeographicPartition) -> None:
+    coloring_assignment = calculate_equitable_coloring(partition)
+    plot_map_impl(partition, coloring_assignment, None)
+
+
+def plot_map_impl(partition: GeographicPartition, coloring_assignment: dict[str, int],
+                  district_text_colors: Optional[dict[int, int]]) -> None:
+    colored_partition = GeographicPartition(partition.graph, assignment=coloring_assignment, updaters=[])
+    colored_partition.plot(cmap='CustomStacked', linewidth=.1, edgecolor='0.8',
+                           vmax=20)  # number colors in colmormap - 1
+    district_geometries = build_district_geometries(partition.graph, partition.assignment)
+    plot_boundaries(district_geometries.values())
+    plot_district_numbers(district_geometries, district_text_colors, None)
+
+
 def set_figure_size(chamber) -> None:
     if chamber == 'TXHD':
         plt.rcParams['figure.figsize'] = [40, 40]
+    elif chamber == 'DCN':
+        plt.rcParams['figure.figsize'] = [10, 10]
     else:
         plt.rcParams['figure.figsize'] = [20, 20]
 
@@ -538,10 +562,13 @@ def save_proposed_plan_map(chamber: str, directory: str, plan: int) -> None:
     coloring_assignment = calculate_equitable_coloring(partition)
 
     reports_directory, report_filename_prefix = cm.build_reports_directory_and_filename(chamber, directory, plan)
-    save_plan_map(chamber, partition, coloring_assignment, None, f'{reports_directory}{report_filename_prefix}_map.pdf')
+    save_plan_map(chamber, partition, coloring_assignment, None, f'{reports_directory}{report_filename_prefix}_map')
 
 
 def save_proposed_plan_diff_map_reversed(chamber: str, directory: str, plan: int) -> None:
+    if chamber == 'DCN':
+        return
+
     census_chamber = dt.get_census_chamber_name(chamber)
     partition = si.load_geographic_partition(chamber, directory, plan, columns=['geometry', census_chamber])
 
@@ -574,11 +601,25 @@ def save_ensemble_map(chamber: str, directory: str, graph: Graph, plans: np.ndar
 
 
 def save_proposed_plan_diff_map(chamber: str, directory: str, plan: int) -> None:
-    census_chamber = dt.get_census_chamber_name(chamber)
-    partition = si.load_geographic_partition(chamber, directory, plan, columns=['geometry', census_chamber])
-
-    assignments_2010 = {geoid: int(node[census_chamber]) for geoid, node in partition.graph.nodes.items()}
-    partition_2010 = GeographicPartition(partition.graph, assignments_2010)
+    if chamber in cm.CHAMBERS:
+        census_chamber = dt.get_census_chamber_name(chamber)
+        partition = si.load_geographic_partition(chamber, directory, plan, columns=['geometry', census_chamber])
+        assignments_2010 = {geoid: int(node[census_chamber]) for geoid, node in partition.graph.nodes.items()}
+        partition_2010 = GeographicPartition(partition.graph, assignments_2010)
+    elif chamber == 'DCN':
+        partition = si.load_geographic_partition(chamber, directory, plan, columns=['geometry'])
+        original_plan = cm.determine_original_plan(chamber)
+        assert isinstance(original_plan, int)
+        bef_df = pp.load_block_equivalency_file(chamber, directory, original_plan)
+        pp.normalize_block_equivalency_df(chamber, bef_df)
+        bef_df.set_index('geoid', inplace=True)
+        node_to_node_assignments = {geoid: x for x, y in partition.graph.nodes().items() for geoid in
+                                    y['node_geoids'].split(",")}
+        node_mappings = [(y, bef_df.loc[x]['assignment'] if x in bef_df.index else None) for x, y in
+                         node_to_node_assignments.items()]
+        groups = cm.groupby_project(node_mappings, lambda x: x[0], lambda x: x[1])
+        assignments_current = {x: statistics.mode(y) for x, y in groups}
+        partition_2010 = GeographicPartition(partition.graph, assignments_current)
 
     coloring_assignment = calculate_equitable_coloring(partition)
     district_coloring_array, district_coloring_dict = build_district_coloring(coloring_assignment, partition)
@@ -638,7 +679,7 @@ if __name__ == '__main__':
         directory = 'G:/rob/projects/election/rob/'
 
         if True:
-            for chamber in cm.CHAMBERS:  # ['USCD']:  #
+            for chamber in ['DCN']:  # cm.CHAMBERS:
                 print(f"Saving plots for {chamber}")
                 current_plan = cm.determine_original_plan(chamber)
 
@@ -680,10 +721,10 @@ if __name__ == '__main__':
         if False:
             register_colormap()
 
-            for chamber in cm.CHAMBERS:  # ['USCD', 'TXHD']:  #
+            for chamber in ['DCN']:  # cm.CHAMBERS:
                 print(chamber)
 
-                if True:
+                if False:
                     plan = pp.build_final_plan(chamber)
                     save_proposed_plan_diff_map(chamber, directory, plan)
                     save_proposed_plan_diff_map_reversed(chamber, directory, plan)
@@ -691,6 +732,9 @@ if __name__ == '__main__':
 
                 for plan in sorted(pp.get_valid_plans(chamber, pp.build_plans_directory(directory)) - {2100},
                                    reverse=True):
+                    if plan < 93173:
+                        return
+
                     print(plan)
                     save_proposed_plan_diff_map(chamber, directory, plan)
                     save_proposed_plan_diff_map_reversed(chamber, directory, plan)

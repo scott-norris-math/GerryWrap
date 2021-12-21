@@ -1,14 +1,13 @@
-import os
-import csv
-import zipfile
-from collections import defaultdict
-from itertools import groupby
-from typing import Iterable, Callable, Any, Optional
-import numpy as np
-import gerrychain
-import pickle
-
 from addict import Dict
+from collections import defaultdict
+import csv
+import gerrychain
+from itertools import groupby
+import numpy as np
+import os
+import pickle
+from typing import Iterable, Callable, Any, Optional
+import zipfile
 
 
 CHAMBERS = ['USCD', 'TXSN', 'TXHD']
@@ -87,7 +86,7 @@ def load_numpy_compressed(path: str) -> np.ndarray:
 
 
 def build_plan_name(chamber: str, plan: int) -> str:
-    return f"{encode_chamber_character(chamber)}{plan}"
+    return f"{encode_chamber(chamber)}{plan}"
 
 
 def load_plan_vectors(chamber: str, input_directory: str, statistic_name: str, plans: Iterable[int]) -> \
@@ -114,11 +113,12 @@ def build_ensemble_description(chamber: str, seed_description: str, ensemble_num
     return f'{chamber}_{seed_description}_{ensemble_number}'
 
 
-def encode_chamber_character(chamber: str) -> str:
+def encode_chamber(chamber: str) -> str:
     return {
         'USCD': 'C',
         'TXSN': 'S',
-        'TXHD': 'H'
+        'TXHD': 'H',
+        'DCN': 'DCN'
     }[chamber]
 
 
@@ -147,7 +147,8 @@ def get_number_districts(chamber: str) -> int:
     return {
         'USCD': 38,
         'TXSN': 31,
-        'TXHD': 150
+        'TXHD': 150,
+        'DCN': 14
     }[chamber]
 
 
@@ -155,7 +156,8 @@ def get_allowed_number_districts(chamber: str) -> list[int]:
     return {
         'USCD': [36, 38],
         'TXSN': [31],
-        'TXHD': [150]
+        'TXHD': [150],
+        'DCN': [14]
     }[chamber]
 
 
@@ -253,6 +255,24 @@ def load_pickle(path: str) -> Any:
     return obj
 
 
+def determine_original_plan(chamber: str) -> Optional[int]:
+    return {
+        'USCD': None,
+        'TXHD': 2100,
+        'TXSN': 2100,
+        'DCN': 2100,
+    }[chamber]
+
+
+def determine_population_limit(chamber: str) -> float:
+    return {
+        'USCD': .01,
+        'TXSN': .02,
+        'TXHD': .05,
+        'DCN': .10
+    }[chamber]
+
+
 def get_current_ensemble(chamber: str) -> tuple[str, int]:
     if chamber == 'USCD':
         seed_description = 'random_seed'
@@ -263,26 +283,36 @@ def get_current_ensemble(chamber: str) -> tuple[str, int]:
     elif chamber == 'TXHD':
         seed_description = '2176_product'
         ensemble_number = 1
+    elif chamber == 'DCN':
+        seed_description = '83605'
+        ensemble_number = 2
     else:
         raise RuntimeError("Unknown chamber")
 
     return seed_description, ensemble_number
 
 
-def determine_original_plan(chamber: str) -> Optional[int]:
-    return {
-        'USCD': None,
-        'TXHD': 2100,
-        'TXSN': 2100
-    }[chamber]
+def build_settings(chamber: str) -> Dict:
+    if chamber == 'TXHD':
+        plan = 2176
+        settings = build_proposed_plan_simulation_settings(chamber, plan)
+        settings.number_files = 0
+        settings.ensemble_description = f'{chamber}_{plan}_product_1'
+    elif chamber == 'TXSN':
+        settings = build_TXSN_random_seed_simulation_settings()
+        settings.number_files = 7
+        settings.ensemble_description = 'TXSN_random_seed_2'
+    elif chamber == 'USCD':
+        settings = build_USCD_random_seed_simulation_settings()
+        settings.number_files = 15
+        settings.ensemble_description = 'USCD_random_seed_2'
+    elif chamber == 'DCN':
+        plan = 83605
+        settings = build_proposed_plan_simulation_settings(chamber, plan)
+        settings.number_files = 200
+        settings.ensemble_description = f'{chamber}_{plan}_2'
 
-
-def determine_population_limit(chamber: str) -> float:
-    return {
-        'USCD': .01,
-        'TXSN': .02,
-        'TXHD': .05
-    }[chamber]
+    return settings
 
 
 def build_proposed_plan_simulation_settings(chamber: str, plan: int) -> Dict:
@@ -310,7 +340,7 @@ def build_USCD_random_seed_simulation_settings() -> Dict:
 
 def build_reports_directory_and_filename(chamber: str, directory: str, plan: int) -> tuple[str, str]:
     reports_directory = build_reports_directory(directory)
-    report_filename_prefix = f'report_{encode_chamber_character(chamber)}{plan}'
+    report_filename_prefix = f'report_{encode_chamber(chamber)}{plan}'
     ensure_directory_exists(reports_directory)
     return reports_directory, report_filename_prefix
 

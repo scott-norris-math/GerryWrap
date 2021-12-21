@@ -1,22 +1,23 @@
+import csv
+from datetime import datetime
+import gzip
+from itertools import chain, product
+import matplotlib.pyplot as plt
 import networkx as nx
 import networkx.algorithms.bipartite.matching as ma
 import numpy as np
-from typing import Callable, Iterable, Any, Optional
-from itertools import chain, product
+import os
 import pandas as pd
-import random
 import pickle
-from datetime import datetime
+import random
 from scipy import stats
-import matplotlib.pyplot as plt
 import shapely as sh
-import gzip
-import csv
+from typing import Callable, Iterable, Any, Optional
 
 import common as cm
-import simulation as si
-import proposed_plans as pp
 import data_transform as dt
+import proposed_plans as pp
+import simulation as si
 from timer import Timer
 
 
@@ -27,7 +28,6 @@ def load_redistricting_data(directory: str) -> pd.DataFrame:
     data['cnty'] = [x[-3:] for x in data['cnty']]
     data['geoid'] = [x[2:] for x in data['geoid']]
     data['polygon'] = data['polygon'].apply(sh.wkt.loads)
-    data.set_index('geoid', inplace=True, drop=False)
     return data
 
 
@@ -130,8 +130,7 @@ def save_2010_node_data(chamber: str, directory: str, geographic_unit: str) -> N
 
 
 def save_plan_node_data(chamber: str, directory: str, geographic_unit: str, plan: int, data: pd.DataFrame) -> None:
-    plan_geoid_column = 'SCTBKEY'
-    plan_district_column = 'DISTRICT'
+    plan_geoid_column, plan_district_column = pp.build_plan_columns(chamber)
     data = assign_plan_districts(chamber, directory, data, plan, plan_geoid_column, plan_district_column)
     node_data = build_node_data(data, geographic_unit)
     seed_filename_prefix = build_seed_filename_prefix(chamber, geographic_unit, plan)
@@ -162,9 +161,10 @@ def build_dual_graph(chamber: str, node_data: pd.DataFrame) -> nx.Graph:
             if perimeter > .01:
                 intersections.add((x_geoid, y_geoid))
 
-    seats_column = f'seats_{dt.get_census_chamber_name(chamber)}'
-    node_attr = ['geoid', 'county', 'district', 'total_pop', seats_column, 'aland', 'perim', 'node_geoids',
+    node_attr = ['geoid', 'county', 'district', 'total_pop', 'aland', 'perim', 'node_geoids',
                  'node_districts']
+    if chamber in cm.CHAMBERS:
+        node_attr = node_attr + [f'seats_{dt.get_census_chamber_name(chamber)}']
 
     graph = nx.from_edgelist(intersections)
     selected_node_data = node_data.filter(items=node_attr, axis='columns')
@@ -407,17 +407,20 @@ def save_region_product_ensemble(chamber: str, reduced_ensemble_directory: str, 
 
 
 def save_seed(chamber: str, directory: str, geographic_unit: str, plan: Optional[int],
-              redistricting_data: Optional[pd.DataFrame] = None) -> None:
+              redistricting_data: pd.DataFrame) -> None:
     create_2010_seed = plan is None
+
     if create_2010_seed:
         save_2010_node_data(chamber, directory, geographic_unit)
-        seed_filename_prefix = build_seed_filename_prefix(chamber, geographic_unit, 2010)
     else:
         assert isinstance(plan, int)
-        redistricting_data = load_redistricting_data(directory) if redistricting_data is None else redistricting_data
-        assert isinstance(redistricting_data, pd.DataFrame)
         save_plan_node_data(chamber, directory, geographic_unit, plan, redistricting_data)
-        seed_filename_prefix = build_seed_filename_prefix(chamber, geographic_unit, plan)
+
+    seed_filename_prefix = build_seed_filename_prefix(chamber, geographic_unit, 2010 if create_2010_seed else plan)
+    seeds_directory = cm.build_seeds_directory(directory)
+
+    dual_graph_path_prefix = f'{seeds_directory}graph_{seed_filename_prefix}'
+    dual_graph_path = dual_graph_path_prefix + '.gpickle'
 
     node_data = load_node_data(directory, seed_filename_prefix)
     dual_graph = build_dual_graph(chamber, node_data)
@@ -425,17 +428,15 @@ def save_seed(chamber: str, directory: str, geographic_unit: str, plan: Optional
     if create_2010_seed and chamber == 'USCD':
         add_new_districts(dual_graph, 36, 2, node_data)
 
-    seeds_directory = cm.build_seeds_directory(directory)
-
-    dual_graph_path_prefix = f'{seeds_directory}graph_{seed_filename_prefix}'
-    nx.write_gpickle(dual_graph, dual_graph_path_prefix + '.gpickle')
+    nx.write_gpickle(dual_graph, dual_graph_path)
     save_graph_compressed_json(dual_graph, dual_graph_path_prefix + '.json.gz')
 
-    county_district_graph = build_country_district_graph(chamber, dual_graph)
+    if chamber in cm.CHAMBERS:
+        county_district_graph = build_country_district_graph(chamber, dual_graph)
 
-    county_district_graph_path_prefix = f'{seeds_directory}adj_{seed_filename_prefix}'
-    nx.write_gpickle(county_district_graph, county_district_graph_path_prefix + '.gpickle')
-    save_graph_compressed_json(county_district_graph, county_district_graph_path_prefix + '.json.gz')
+        county_district_graph_path_prefix = f'{seeds_directory}adj_{seed_filename_prefix}'
+        nx.write_gpickle(county_district_graph, county_district_graph_path_prefix + '.gpickle')
+        save_graph_compressed_json(county_district_graph, county_district_graph_path_prefix + '.json.gz')
 
 
 if __name__ == '__main__':
@@ -447,7 +448,8 @@ if __name__ == '__main__':
         settings = cm.build_proposed_plan_simulation_settings(chamber, plan)
 
         seeds_directory = cm.build_seeds_directory(directory)
-        dual_graph = nx.read_gpickle(seeds_directory + 'graph_TX_2020_cntyvtd_TXHD_2176_Reduced.gpickle')  # settings.dual_graph_filename)
+        dual_graph = nx.read_gpickle(
+            seeds_directory + 'graph_TX_2020_cntyvtd_TXHD_2176_Reduced.gpickle')  # settings.dual_graph_filename)
         county_district_graph = si.load_county_district_graph(directory, settings.country_district_graph_filename)
 
         minimum_whole_counties = 4
@@ -488,14 +490,18 @@ if __name__ == '__main__':
 
             np.savez_compressed(f'{product_ensemble_directory}defects.npz', np.array(defects))
 
-        if False:
+        if True:
             geographic_unit = 'cntyvtd'
 
             redistricting_data = load_redistricting_data(directory)
+            redistricting_data.set_index(['geoid'], inplace=True, drop=False)
 
-            for chamber in cm.CHAMBERS:
+            for chamber in ['DCN']:  # cm.CHAMBERS:
                 print(chamber)
                 for plan in pp.get_valid_plans(chamber, pp.build_plans_directory(directory)) - {2100}:
+                    if plan < 93173:
+                        return
+
                     print(plan)
                     save_seed(chamber, directory, geographic_unit, plan, redistricting_data)
 

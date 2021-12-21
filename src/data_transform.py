@@ -1,11 +1,11 @@
-from os import listdir
-from os.path import isfile, exists
 from collections import defaultdict
-import pandas as pd
-from typing import Callable, Iterable
+from datetime import datetime
 import networkx as nx
 import numpy as np
-from datetime import datetime
+from os import listdir
+from os.path import isfile, exists
+import pandas as pd
+from typing import Callable, Iterable, Optional
 
 import common as cm
 import proposed_plans as pp
@@ -207,7 +207,8 @@ def combine_and_fix_redistricting_data_file(directory: str) -> None:
 
 
 def save_ensemble_matrices(chamber: str, directory: str, redistricting_data_filename: str, graph: nx.Graph,
-                           ensemble_description: str, use_unique_plans, file_numbers: Iterable[int]) -> None:
+                           ensemble_description: str, use_unique_plans, file_numbers: Optional[Iterable[int]],
+                           force: bool) -> None:
     node_data = load_filtered_redistricting_data(directory, redistricting_data_filename)
     statistics_settings = build_statistics_settings()
     ensemble_directory = cm.build_ensemble_directory(directory, ensemble_description)
@@ -215,11 +216,11 @@ def save_ensemble_matrices(chamber: str, directory: str, redistricting_data_file
     if use_unique_plans:
         plans = cm.load_plans_from_path(f'{ensemble_directory}unique_plans.npz')
     else:
+        assert isinstance(file_numbers, Iterable)
         plans = cm.load_plans_from_files(directory, ensemble_description, file_numbers)
 
-    suffix = '_unique' if use_unique_plans else ''
-    statistics_paths = {x: f'{ensemble_directory}{x}{suffix}.npz' for x, _ in statistics_settings}
-    statistics_settings = [(x, y) for x, y in statistics_settings if not exists(statistics_paths[x])]
+    statistics_paths = {x: f'{ensemble_directory}{x}.npz' for x, _ in statistics_settings}
+    statistics_settings = [(x, y) for x, y in statistics_settings if force or not exists(statistics_paths[x])]
     if len(statistics_settings) == 0:
         print("All ensemble matrices already exist")
         return
@@ -294,32 +295,16 @@ if __name__ == '__main__':
 
         directory = 'G:/rob/projects/election/rob/'
 
-        chamber = 'TXSN'  # 'USCD'  # 'TXHD'  #
+        chamber = 'DCN'  # 'USCD'  # 'TXHD'  #
 
-        if chamber == 'TXHD':
-            plan = 2176
-            settings = cm.build_proposed_plan_simulation_settings(chamber, plan)
-            max_file_number = 0
-            ensemble_description = f'{chamber}_{plan}_product_1'
-            redistricting_data_filename = 'nodes_TX_2020_cnty_cntyvtd_sldu.parquet'
-        elif chamber == 'TXSN':
-            settings = cm.build_TXSN_random_seed_simulation_settings()
-            max_file_number = 7
-            ensemble_description = 'TXSN_random_seed_2'
-            redistricting_data_filename = 'nodes_TX_2020_cnty_cntyvtd_sldu.parquet'
-        elif chamber == 'USCD':
-            settings = cm.build_USCD_random_seed_simulation_settings()
-            max_file_number = 15
-            ensemble_description = 'USCD_random_seed_2'
-            redistricting_data_filename = 'nodes_TX_2020_cntyvtd_cd.csv'
+        settings = cm.build_settings(chamber)
 
         if False:
             combine_and_fix_redistricting_data_file(directory)
 
         if False:
-            # ensemble_description = 'TXHD_2176_Reduced_3'
-            plans = cm.load_plans_from_files(directory, ensemble_description, range(0, max_file_number))
-            ensemble_directory = cm.build_ensemble_directory(directory, ensemble_description)
+            plans = cm.load_plans_from_files(directory, settings.ensemble_description, range(0, settings.number_files))
+            ensemble_directory = cm.build_ensemble_directory(directory, settings.ensemble_description)
             save_unique_plans(ensemble_directory, plans)
 
         if True:
@@ -327,12 +312,12 @@ if __name__ == '__main__':
             dual_graph = nx.read_gpickle(seeds_directory + settings.dual_graph_filename)
 
             if False:
-                ensemble_directory = cm.build_ensemble_directory(directory, ensemble_description)
+                ensemble_directory = cm.build_ensemble_directory(directory, settings.ensemble_description)
                 convert_to_csv(ensemble_directory, 'total_pop')
                 convert_to_csv(ensemble_directory, 'o17_pop')
             else:
-                save_ensemble_matrices(chamber, directory, redistricting_data_filename, dual_graph,
-                                       ensemble_description, True, None)  # range(0, max_file_number)
+                save_ensemble_matrices(chamber, directory, settings.redistricting_data_filename, dual_graph,
+                                       settings.ensemble_description, False, range(0, settings.number_files), True)  # False, None)  #
 
         if False:
             chamber = 'USCD'
@@ -373,22 +358,4 @@ if __name__ == '__main__':
 
         print('done')
 
-
     main()
-
-# Notes
-# t = Timer(name='class')
-# t.start()
-# # Do something
-# t.stop()
-
-# As a context manager:
-#
-# with Timer(name='context manager'):
-#     # Do something
-
-# As a decorator:
-#
-# @Timer(name='decorator')
-# def stuff():
-#     # Do something
