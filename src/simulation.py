@@ -15,6 +15,7 @@ import pickle
 import networkx as nx
 import numpy as np
 from shapely import wkt
+from shutil import copy2
 import sys
 from typing import Iterable, Any, NamedTuple, Callable, Optional
 
@@ -91,7 +92,7 @@ def fix_election_columns_text(df: pd.DataFrame) -> None:
 def load_graph_with_data(directory: str, dual_graph_filename: str, geodata: gpd.GeoDataFrame,
                              columns: Optional[list[str]] = ['geometry']) -> Graph:
     seeds_directory = cm.build_seeds_directory(directory)
-    dual_graph = nx.read_gpickle(seeds_directory + dual_graph_filename)
+    dual_graph = nx.read_gpickle(f'{seeds_directory}{dual_graph_filename}')
     graph = Graph(dual_graph, geometry=geodata)
     graph.join(geodata, columns=columns, right_index='geoid')
     return graph
@@ -242,16 +243,12 @@ def build_chain(chamber: str, directory: str, settings, number_steps: int) -> tu
     return chain, elections
 
 
-def run_chain(chain: MarkovChain, elections: Iterable[Election], output_directory: str) -> None:
-    run_chain_impl(chain, elections, output_directory)
-
-
 def run_chain_calculate_data(chain: MarkovChain, elections: Iterable[Election], output_directory: str) -> None:
-    run_chain_impl(chain, elections, output_directory, initialize_data, update_data, save_compressed_data)
+    run_chain(chain, elections, output_directory, initialize_data, update_data, save_compressed_data)
 
 
-def run_chain_impl(chain: MarkovChain, elections: Iterable[Election], output_directory: str, initialize_data=None,
-                   update_data=None, save_data=None) -> None:
+def run_chain(chain: MarkovChain, elections: Iterable[Election], output_directory: str, initialize_data=None,
+              update_data=None, save_data=None) -> None:
     def build_maps_directory(directory):
         return f'{directory}maps/'
 
@@ -687,18 +684,27 @@ if __name__ == '__main__':
 
         if True:
             chamber = 'DCN'
-            settings = cm.build_proposed_plan_simulation_settings(chamber, 83605)
+            plan = 93173
+            settings = cm.build_proposed_plan_simulation_settings(chamber, plan)
             # settings = cm.build_TXSN_random_seed_simulation_settings()
 
-            number_steps = 500000000  # 300  #
+            number_steps = 100 * 100000
 
-            suffix = '83605'
-            ensemble_number = 2
+            suffix = f'{plan}'
+            ensemble_number = 1
             ensemble_description = cm.build_ensemble_description(chamber, suffix, ensemble_number)
-            output_directory = cm.build_ensemble_directory(directory, ensemble_description)
+            ensemble_directory = cm.build_ensemble_directory(directory, ensemble_description)
 
             chain, elections = build_chain(chamber, directory, settings, number_steps)
-            run_chain_impl(chain, elections, output_directory)
+            cm.ensure_directory_exists(ensemble_directory)
+
+            seeds_directory = cm.build_seeds_directory(directory)
+            copy2(f'{seeds_directory}{settings.dual_graph_filename}', ensemble_directory)
+            if chamber in cm.CHAMBERS:
+                copy2(f'{seeds_directory}{settings.country_district_graph_filename}', ensemble_directory)
+            copy2(f'{pp.build_redistricting_data_directory(directory)}{settings.redistricting_data_filename}', ensemble_directory)
+
+            run_chain(chain, elections, ensemble_directory)
 
 
     main()

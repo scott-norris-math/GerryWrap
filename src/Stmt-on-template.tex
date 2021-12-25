@@ -121,7 +121,7 @@ Republican-leaning to Democratic-leaning districts. \ This smooth increase is th
 
 \begin{figure*}
 \hspace*{-1.5cm}
-\includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}seats-voteshares-ensemble-comps-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-PRES20.pdf}
+\includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}seats-voteshares-ensemble-comps-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-\VAR{election}20.pdf}
 \caption{}
 \label{fig:1}
 \end{figure*}
@@ -129,7 +129,7 @@ Republican-leaning to Democratic-leaning districts. \ This smooth increase is th
 \bigskip
 
 \begin{figure*}
-{\centering \includegraphics[width=6.5in,height=3.5in]{\VAR{plots_directory}seats-voteshares-ensemble-enacted-\VAR{chamber}-\VAR{plan}-PRES20.pdf} \par}
+{\centering \includegraphics[width=6.5in,height=3.5in]{\VAR{plots_directory}seats-voteshares-ensemble-enacted-\VAR{chamber}-\VAR{plan}-\VAR{election}20.pdf} \par}
 \caption{}
 \label{fig:2}
 \end{figure*}
@@ -149,12 +149,12 @@ In Figure~\ref{fig:2}, we show the same data, but now identify two signatures of
 % figure).
 
 We also compute two common numbers that political scientists use to ``score'' maps. \ The first such number is called
-the ``mean-median'' score: the difference in statewide vote percentage each party would need to win the majority of the
-chamber. %\ For the proposed map, the Republican Party would need to win only \textbf{42.2\%} of the vote to win 19
+the ``mean-median'' score: the difference in statewide vote percentage between the Republicans and Democrats required for them 
+to win the majority of the chamber. %\ For the proposed map, the Republican Party would need to win only \textbf{42.2\%} of the vote to win 19
 %seats, while the Democratic Party would need to earn \textbf{57.8\%}; the difference of these numbers gives a
 %``mean-median'' score of \textbf{15.6 }(note: to get these numbers from the figure, scale up by a factor of 100). 
 The second such score is called the ``partisan bias'' score: \ the difference in the number of seats each party wins if
-each were to earn 50\% of the vote. 
+each were to earn 50\% of the vote. A positive score in either favors Democrats.
 %\ For the proposed map, the Republican Party would win \textbf{24 seats} with 50\%
 %of the vote, while the Democratic Party would win only \textbf{14 seats}; the difference of these numbers gives a
 %``partisan bias'' score of \textbf{{}--10}. \textstylenormaltextrun{In contrast, the median map in our ensemble has a
@@ -162,8 +162,8 @@ each were to earn 50\% of the vote.
 %Republican Party wins \textbf{18 }seats to the Democratic Party's \textbf{20}).}\textstyleeop{~}
 
 \begin{figure*}
-{\centering  \includegraphics[width=5.8154in,height=3.1311in]{\VAR{plots_directory}mean-median-partisan-bias-ensemble-enacted-\VAR{chamber}-\VAR{plan}-PRES20.pdf}  \\
- \includegraphics[width=5.6909in,height=4.3752in]{\VAR{plots_directory}partisan-metrics-2D-\VAR{chamber}-\VAR{plan}-PRES20.pdf} \par}
+{\centering  \includegraphics[width=5.8154in,height=3.1311in]{\VAR{plots_directory}mean-median-partisan-bias-ensemble-enacted-\VAR{chamber}-\VAR{plan}-\VAR{election}20.pdf}  \\
+ \includegraphics[width=5.6909in,height=4.3752in]{\VAR{plots_directory}partisan-metrics-2D-\VAR{chamber}-\VAR{plan}-\VAR{election}20.pdf} \par}
 \caption{}
 \label{fig:3}
 \end{figure*}
@@ -177,7 +177,7 @@ little? \ A lot? \ An extreme amount? \ This question can be answered using stat
 to the \textit{distribution }of those scores within the \VAR{number_plans} - map ensemble. \ This is done in Figure~\ref{fig:3}.  The second row shows the joint distribution of mean-median and partisan bias. 
 
 \begin{figure*}
-{\centering \includegraphics[width=6.5in,height=3.5in]{\VAR{plots_directory}violin-plot-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-BHVAP.pdf} \par}
+{\centering \includegraphics[width=6.5in,height=3.5in]{\VAR{plots_directory}violin-plot-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-BH-VAP.pdf} \par}
 \caption{}
 \label{fig:4}
 \end{figure*}
@@ -221,14 +221,15 @@ the value for the Proposed map is shown in red. In Figure~\ref{fig:5} we show th
 \tablelasttail{}
 \begin{supertabular}{|l|l|}
 \hline
-\selectlanguage{english}  \includegraphics[width=3.2902in,height=2.1945in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-BHVAP-0.5.pdf}  &
-\selectlanguage{english}  \includegraphics[width=3.2902in,height=2.1945in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-BHVAP-0.7.pdf} \\\hline
+\selectlanguage{english}  \includegraphics[width=3.2902in,height=2.1945in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-BH-VAP-0.5.pdf}  &
+\selectlanguage{english}  \includegraphics[width=3.2902in,height=2.1945in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-BH-VAP-0.7.pdf} \\\hline
 \end{supertabular}
 \end{flushleft}
 \caption{}
 \label{fig:5}
 \end{figure*}
-
+\maxdeadcycles=1000
+\extrafloats{100}
 
 %Here is what we observe:
 
@@ -272,51 +273,60 @@ the value for the Proposed map is shown in red. In Figure~\ref{fig:5} we show th
 {\centering \includegraphics[width=5.8154in,height=3.1311in]{\VAR{plots_directory}mean-median-partisan-bias-ensemble-enacted-\VAR{chamber}-\VAR{plan}-SEN20.pdf} \par}
 {\centering \includegraphics[width=4.6909in,height=3.3752in]{\VAR{plots_directory}partisan-metrics-2D-\VAR{chamber}-\VAR{plan}-SEN20.pdf} \par}
 
-{\centering \includegraphics[width=6.5in,height=3.5in]{\VAR{plots_directory}violin-plot-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-BVAP.pdf} \par}
-{\centering \includegraphics[width=6.5in,height=3.5in]{\VAR{plots_directory}violin-plot-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-HVAP.pdf} \par}
-{\centering \includegraphics[width=6.5in,height=3.5in]{\VAR{plots_directory}violin-plot-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-BHVAP.pdf} \par}
-{\centering \includegraphics[width=6.5in,height=3.5in]{\VAR{plots_directory}violin-plot-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-NWVAP.pdf} \par}
+\BLOCK{ for population_group in population_groups }
+{\centering \includegraphics[width=6.5in,height=3.5in]{\VAR{plots_directory}violin-plot-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-B-\VAR{population_group}.pdf} \par}
+{\centering \includegraphics[width=6.5in,height=3.5in]{\VAR{plots_directory}violin-plot-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-H-\VAR{population_group}.pdf} \par}
+{\centering \includegraphics[width=6.5in,height=3.5in]{\VAR{plots_directory}violin-plot-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-BH-\VAR{population_group}.pdf} \par}
+{\centering \includegraphics[width=6.5in,height=3.5in]{\VAR{plots_directory}violin-plot-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-NW-\VAR{population_group}.pdf} \par}
+\BLOCK{ endfor }
 
+\BLOCK{ for population_group in population_groups }
 \begin{figure*}[h]
-\includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-BVAP-0.3.pdf}
-\includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-BVAP-0.4.pdf}
+\includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-B-\VAR{population_group}-0.3.pdf}
+\includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-B-\VAR{population_group}-0.4.pdf}
 \end{figure*}
 \begin{figure*}[h]
-\includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-BVAP-0.5.pdf}
-\end{figure*}
-
-\begin{figure*}[h]
-\includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-HVAP-0.5.pdf}
-\includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-HVAP-0.55.pdf}
-\end{figure*}
-\begin{figure*}[h]
-\includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-HVAP-0.6.pdf}
-\includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-HVAP-0.65.pdf}
+\includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-B-\VAR{population_group}-0.5.pdf}
 \end{figure*}
 
 \begin{figure*}[h]
-\includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-BHVAP-0.5.pdf}
-\includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-BHVAP-0.6.pdf}
+\includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-H-\VAR{population_group}-0.5.pdf}
+\includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-H-\VAR{population_group}-0.55.pdf}
 \end{figure*}
 \begin{figure*}[h]
-\includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-BHVAP-0.7.pdf}
+\includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-H-\VAR{population_group}-0.6.pdf}
+\includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-H-\VAR{population_group}-0.65.pdf}
 \end{figure*}
 
 \begin{figure*}[h]
-\includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-NWVAP-0.5.pdf}
-\includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-NWVAP-0.6.pdf}
+\includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-BH-\VAR{population_group}-0.5.pdf}
+\includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-BH-\VAR{population_group}-0.6.pdf}
 \end{figure*}
 \begin{figure*}[h]
-\includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-NWVAP-0.7.pdf}
+\includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-BH-\VAR{population_group}-0.7.pdf}
 \end{figure*}
 
-\begin{figure*}[h]{\centering \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}racial-political-deviations-with-ensemble-\VAR{chamber}-\VAR{plan}-PRES20-BVAP.pdf} \par}\end{figure*}
-\begin{figure*}[h]{\centering \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}racial-political-deviations-with-ensemble-\VAR{chamber}-\VAR{plan}-PRES20-HVAP.pdf} \par}\end{figure*}
-\begin{figure*}[h]{\centering \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}racial-political-deviations-with-ensemble-\VAR{chamber}-\VAR{plan}-PRES20-BHVAP.pdf} \par}\end{figure*}
-\begin{figure*}[h]{\centering \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}racial-political-deviations-with-ensemble-\VAR{chamber}-\VAR{plan}-PRES20-NWVAP.pdf} \par}\end{figure*}
+\begin{figure*}[h]
+\includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-NW-\VAR{population_group}-0.5.pdf}
+\includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-NW-\VAR{population_group}-0.6.pdf}
+\end{figure*}
+\begin{figure*}[h]
+\includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-NW-\VAR{population_group}-0.7.pdf}
+\end{figure*}
+\BLOCK{ endfor }
 
-\begin{figure*}[h]{\centering \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}racial-political-deviations-with-ensemble-\VAR{chamber}-\VAR{plan}-SEN20-BVAP.pdf} \par}\end{figure*}
-\begin{figure*}[h]{\centering \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}racial-political-deviations-with-ensemble-\VAR{chamber}-\VAR{plan}-SEN20-HVAP.pdf} \par}\end{figure*}
-\begin{figure*}[h]{\centering \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}racial-political-deviations-with-ensemble-\VAR{chamber}-\VAR{plan}-SEN20-BHVAP.pdf} \par}\end{figure*}
-\begin{figure*}[h]{\centering \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}racial-political-deviations-with-ensemble-\VAR{chamber}-\VAR{plan}-SEN20-NWVAP.pdf} \par}\end{figure*}
+\BLOCK{ for population_group in population_groups }
+\begin{figure*}[h]{\centering \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}racial-political-deviations-with-ensemble-\VAR{chamber}-\VAR{plan}-PRES20-B-\VAR{population_group}.pdf} \par}\end{figure*}
+\begin{figure*}[h]{\centering \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}racial-political-deviations-with-ensemble-\VAR{chamber}-\VAR{plan}-PRES20-H-\VAR{population_group}.pdf} \par}\end{figure*}
+\begin{figure*}[h]{\centering \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}racial-political-deviations-with-ensemble-\VAR{chamber}-\VAR{plan}-PRES20-BH-\VAR{population_group}.pdf} \par}\end{figure*}
+\begin{figure*}[h]{\centering \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}racial-political-deviations-with-ensemble-\VAR{chamber}-\VAR{plan}-PRES20-NW-\VAR{population_group}.pdf} \par}\end{figure*}
+\BLOCK{ endfor }
+
+\BLOCK{ for population_group in population_groups }
+\begin{figure*}[h]{\centering \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}racial-political-deviations-with-ensemble-\VAR{chamber}-\VAR{plan}-SEN20-B-\VAR{population_group}.pdf} \par}\end{figure*}
+\begin{figure*}[h]{\centering \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}racial-political-deviations-with-ensemble-\VAR{chamber}-\VAR{plan}-SEN20-H-\VAR{population_group}.pdf} \par}\end{figure*}
+\begin{figure*}[h]{\centering \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}racial-political-deviations-with-ensemble-\VAR{chamber}-\VAR{plan}-SEN20-BH-\VAR{population_group}.pdf} \par}\end{figure*}
+\begin{figure*}[h]{\centering \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}racial-political-deviations-with-ensemble-\VAR{chamber}-\VAR{plan}-SEN20-NW-\VAR{population_group}.pdf} \par}\end{figure*}
+\BLOCK{ endfor }
+
 \end{document}

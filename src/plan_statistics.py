@@ -13,10 +13,10 @@ import proposed_plans as pp
 
 def calculate_mean_median(plan_vector: np.ndarray) -> float:
     # mean-median score, denominated in terms of "percentage needed for
-    #  majority" (D - R). Effectively this is: x -1 (to get D-R),
-    #   x 2 (because MM measures diff. from midpoint), and
+    #  majority" (R - D). Effectively this is:
+    #  2 (because MM measures diff. from midpoint), and
     #   x 100 (to make it a %)
-    return -200 * (np.median(plan_vector) - np.mean(plan_vector))
+    return 200 * (np.median(plan_vector) - np.mean(plan_vector))
 
 
 def calculate_partisan_bias(plan_vector: np.ndarray) -> float:
@@ -29,72 +29,8 @@ def calculate_partisan_bias(plan_vector: np.ndarray) -> float:
     number_seats2 = np.count_nonzero(seats_votes2 <= 0.5)
 
     # 2 * np.count_nonzero(np.array(plan_vector) >= mean_voteshare) - number districts
+
     return number_seats1 - number_seats2
-
-
-def determine_statements_v1(chamber: str, mm_ensemble: np.ndarray, pb_ensemble: np.ndarray, plans: list[int],
-                            plan_vectors: dict[int, np.ndarray]) -> list[str]:
-    mm_ensemble_median = np.median(mm_ensemble)
-    pb_ensemble_median = np.median(pb_ensemble)
-
-    statements = [
-        f"Ensemble Mean-Median - Min: {min(mm_ensemble)} Median: {mm_ensemble_median} Max: {max(mm_ensemble)}",
-        f"Ensemble Partisan Bias - Min: {min(pb_ensemble)} Median: {pb_ensemble_median} Max: {max(pb_ensemble)}", "\n"]
-
-    number_ensemble_plans = len(mm_ensemble)
-    for plan in plans:
-        plan_name = f'{cm.encode_chamber(chamber)}{plan}'
-        statements.append(plan_name)
-
-        plan_vector = plan_vectors[plan]
-        mm_plan = calculate_mean_median(plan_vector)
-        pb_plan = calculate_partisan_bias(plan_vector)
-
-        mm_portion = np.count_nonzero(mm_plan <= mm_ensemble) / number_ensemble_plans
-        statements.append(plan_name + ": MM = " + str(mm_plan)
-                          + " is <= %6.6f" % mm_portion
-                          + " and is > %6.6f" % (1 - mm_portion))
-
-        pb_less_than_portion = np.count_nonzero(pb_plan < pb_ensemble) / number_ensemble_plans
-        pb_equals_portion = np.count_nonzero(pb_plan == pb_ensemble) / number_ensemble_plans
-        statements.append(plan_name + ": PB = " + str(pb_plan)
-                          + " is < %6.6f" % pb_less_than_portion
-                          + ", is == %6.6f" % pb_equals_portion
-                          + ", and is > %6.6f" % (1 - pb_less_than_portion - pb_equals_portion))
-
-        if mm_plan > mm_ensemble_median:
-            if pb_plan < pb_ensemble_median:
-                statements.append(plan_name + " favors Republicans")
-                ckPlg = 1
-            else:
-                statements.append(plan_name + " is ambiguous")
-                ckPlg = 0
-        else:
-            if pb_plan > pb_ensemble_median:
-                statements.append(plan_name + " favors Democrats")
-                ckPlg = -1
-            else:
-                statements.append(plan_name + " is ambiguous")
-                ckPlg = 0
-
-        # Here, how we quantify how gerrymandered it is should depend on where it
-        #   lives WRT two metrics
-        # If overall plan favors R, we check in that direction
-        # If overall plan favors D, we check in that direction
-        less_gerrymandered_than = -1
-        if ckPlg == 1:
-            less_gerrymandered_than = np.count_nonzero(np.logical_and(mm_ensemble >= mm_plan, pb_ensemble <= pb_plan))
-        elif ckPlg == -1:
-            less_gerrymandered_than = np.count_nonzero(np.logical_and(mm_ensemble <= mm_plan, pb_ensemble >= pb_plan))
-
-        if ckPlg == 0:
-            statements.append(plan_name + " is LESS gerrymandered than "
-                              + str(less_gerrymandered_than) + " out of "
-                              + str(number_ensemble_plans) + " plans")
-
-        statements.append("\n")
-
-    return statements
 
 
 def calculate_ensemble_matrix_statistics(ensemble_matrix: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -199,7 +135,7 @@ def calculate_statistics(chamber: str, mm_ensemble: np.ndarray, pb_ensemble: np.
         plan_statistics.pb_equals_portion = pb_equals_portion
         plan_statistics.pb_percentile = stats.percentileofscore(pb_ensemble, pb_plan, kind='mean')
 
-        if mm_plan > mm_ensemble_median:
+        if mm_plan < mm_ensemble_median:
             if pb_plan < pb_ensemble_median:
                 plan_statistics.bias = 'R'
                 ckPlg = 1
@@ -221,10 +157,10 @@ def calculate_statistics(chamber: str, mm_ensemble: np.ndarray, pb_ensemble: np.
         # If overall plan favors D, we check in that direction
         if ckPlg == 1:
             plan_statistics.less_gerrymandered_than = np.count_nonzero(
-                np.logical_and(mm_ensemble >= mm_plan, pb_ensemble <= pb_plan))
+                np.logical_and(mm_ensemble <= mm_plan, pb_ensemble <= pb_plan))
         elif ckPlg == -1:
             plan_statistics.less_gerrymandered_than = np.count_nonzero(
-                np.logical_and(mm_ensemble <= mm_plan, pb_ensemble >= pb_plan))
+                np.logical_and(mm_ensemble >= mm_plan, pb_ensemble >= pb_plan))
 
         plan_statistics_list.append(plan_statistics)
 
@@ -383,8 +319,8 @@ if __name__ == '__main__':
         directory = 'G:/rob/projects/election/rob/'
 
         if True:
-            admissible_chambers = cm.CHAMBERS  # ['DCN']  #
-            for election in pl.get_elections():
+            admissible_chambers = ['DCN']  # cm.CHAMBERS  #
+            for election in pl.build_elections():
                 file_prefix = dt.build_election_filename_prefix(election)
                 ensemble_statistics = {chamber: load_ensemble_statistics(chamber, directory, file_prefix) for
                                        chamber in admissible_chambers}

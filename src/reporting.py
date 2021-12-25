@@ -12,7 +12,7 @@ def determine_number_plans(chamber: str) -> str:
         'USCD': "1,500,000",
         'TXHD': "1,000,000",
         'TXSN': "617,270",
-        'DCN': "500,000"
+        'DCN': "10,000,000"
     }[chamber]
 
 
@@ -35,6 +35,8 @@ def save_report(chamber: str, directory: str, j2_template: jinja2.Template, plan
         'plan_name': cm.build_plan_name(chamber, plan),
         'original_plan': str(cm.determine_original_plan(chamber)),
         'number_plans': determine_number_plans(chamber),
+        'election': 'SEN' if chamber == 'DCN' else 'PRES',
+        'population_groups': pl.build_population_groups(),
         'plots_directory': pl.build_plots_directory(directory, ensemble_description),
         'report_directory': report_directory,
         'url_root': 'https://storage.googleapis.com/mum_project/reports/'
@@ -72,7 +74,7 @@ if __name__ == '__main__':
 
         j2_template = latex_jinja_env.get_template('Stmt-on-template.tex')
 
-        for chamber in ['DCN']:  # cm.CHAMBERS:
+        for chamber in ['USCD']:  # ['DCN']:  # cm.CHAMBERS:
             print(f"Chamber: {chamber}")
 
             plans = sorted(pp.get_valid_plans(chamber, pp.build_plans_directory(directory)) - {2100}, reverse=True)

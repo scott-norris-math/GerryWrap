@@ -1,3 +1,4 @@
+from typing import Iterable
 import glob
 import matplotlib.pyplot as plt
 import networkx as nx
@@ -26,65 +27,106 @@ def build_plan_columns(chamber: str) -> tuple[str, str]:
         raise RuntimeError(error)
 
 
-def build_columns_path(chamber: str, directory: str) -> str:
-    return build_redistricting_data_calculated_directory(directory) + chamber + "_columns.csv"
+def build_census_columns_path(chamber: str, directory: str) -> str:
+    return f'{build_redistricting_data_calculated_directory(directory)}{chamber}_census_columns.csv'
 
 
 def determine_data_tablock_columns(df: pd.DataFrame) -> list[str]:
-    race_columns = [col for col in df.columns if (col.startswith('o17'))]
+    race_columns = ['hisp_pop', 'nonhisp_pop', 'nonhisp_white'] + \
+                   [col for col in df.columns if (col.startswith(dt.O17) or col.startswith(dt.TOTAL) or col.startswith('nonhisp'))]
     election_columns = [
         'President_2020_D_Biden_general',
         'President_2020_R_Trump_general',
         'USSen_2020_D_Hegar_general',
         'USSen_2020_R_Cornyn_general'
     ]
-    return cm.union(race_columns, election_columns)
+    return list(sorted(cm.union(race_columns, election_columns)))
 
 
-def save_data_tablock_columns(chamber: str, directory: str, data_path: str) -> None:
+def save_data_census_columns(chamber: str, directory: str, data_path: str) -> None:
     data_df = pd.read_parquet(data_path)
     print("Data: " + str(len(data_df)))
-    data_columns = ['geoid', 'county', 'total_pop'] + determine_data_tablock_columns(data_df)
+    data_columns = ['geoid', 'county'] + determine_data_tablock_columns(data_df)
     if chamber in cm.CHAMBERS:
         data_columns = data_columns + [dt.get_census_chamber_name(chamber)]
 
     print("Data Columns: " + str(len(data_columns)))
     print(data_columns)
     columns_df = pd.DataFrame(data_columns, columns=['column'])
-    columns_df.to_csv(build_columns_path(chamber, directory))
+    columns_df.to_csv(build_census_columns_path(chamber, directory))
 
 
-def save_filtered_data(chamber: str, directory: str, data_path: str) -> None:
-    columns = list(pd.read_csv(build_columns_path(chamber, directory))['column'])
+def process_tabblock_data(chamber: str, directory: str) -> None:
+    census_data_path = build_redistricting_data_directory(directory) + (
+        'redistricting_data_nodes_TX_nodes_TX_2020_tabblock_' +
+        dt.get_census_chamber_name(chamber) + '_contract0.parquet' if chamber in cm.CHAMBERS
+        else 'redistricting_data_nodes_TX_nodes_TX_2020_raw.parquet')
+
+    save_data_census_columns(chamber, directory, census_data_path)
+    save_filtered_data(chamber, directory, census_data_path)
+
+
+def save_filtered_data(chamber: str, directory: str, census_data_path: str) -> None:
+    columns = list(pd.read_csv(build_census_columns_path(chamber, directory))['column'])
     print(str(len(columns)) + " " + str(columns))
 
-    data_df = pd.read_parquet(data_path, columns=columns)
+    data_df = pd.read_parquet(census_data_path, columns=columns)
     if chamber == 'DCN':
         data_df['geoid'] = data_df['geoid'].apply(lambda x: x[2:])
+
+    cvap_df = load_cvap_data(directory)
+
+    data_df.set_index('geoid', inplace=True)
+    data_df = data_df.join(cvap_df, how='inner')
+    data_df.reset_index(inplace=True)
+    data_df.rename(columns={'index': 'geoid'}, inplace=True)
 
     data_df.sort_values(by=['geoid'], inplace=True)
     print("Filtered Data: " + str(len(data_df)))
 
     data_df.to_parquet(build_data_filtered_path(chamber, directory, 'parquet'))
-    data_df.to_csv(build_data_filtered_path(chamber, directory, 'csv'))
+    data_df.to_csv(build_data_filtered_path(chamber, directory, 'csv'), index=False)
+
+
+def load_cvap_data(directory: str) -> pd.DataFrame:
+    cvap_df = pd.read_csv(f'{build_redistricting_data_directory(directory)}/tx_cvap_2019_2020_b.csv')
+    cvap_df.rename(columns={'GEOID20': 'geoid'}, inplace=True)
+    cvap_df['geoid'] = cvap_df['geoid'].apply(lambda x: str(x)[2:])
+    cvap_df.set_index('geoid', inplace=True)
+    calculated_df = build_calculated_cvap_data(cvap_df)
+    return calculated_df
+
+
+def build_calculated_cvap_data(df: pd.DataFrame) -> pd.DataFrame:
+    def build_column(population_group, racial_group):
+        return f'{population_group}_{racial_group}19'
+
+    def sum_columns(population_group, columns):
+        return sum([df[build_column(population_group, x)] for x in columns])
+
+    black_columns = ['BLK', 'BLW', 'AIB']
+    hisp_columns = ['HSP']
+    white_columns = ['WHT']
+    other_columns = ['AIA', 'ASN', 'NHP', 'AIW', 'ASW', '2OM']
+    all_columns = black_columns + hisp_columns + white_columns + other_columns
+
+    column_settings = [('calculated_', 'black', black_columns),
+                       ('', 'hisp_pop', hisp_columns),
+                       ('calculated_', 'black_hisp', black_columns + hisp_columns),
+                       ('', 'nonhisp_white', white_columns),
+                       ('', 'pop', all_columns)]
+
+    calculated_df = pd.DataFrame(index=df.index)
+    for population_group in dt.build_cvap_population_groups():
+        for prefix, column_name, columns in column_settings:
+            calculated_df[f'{prefix}{population_group}_{column_name}'] = sum_columns(population_group, columns)
+    return calculated_df
 
 
 def build_data_filtered_path(chamber: str, directory: str, suffix: str) -> str:
-    data_filtered_path_prefix = \
-        build_redistricting_data_calculated_directory(directory) + \
-        'redistricting_data_nodes_TX_nodes_TX_2020_tabblock_' + \
-        chamber + '_filtered'
+    data_filtered_path_prefix = build_redistricting_data_calculated_directory(directory) + \
+                                f'redistricting_data_nodes_TX_nodes_TX_2020_tabblock_{chamber}_filtered'
     return data_filtered_path_prefix + "." + suffix
-
-
-def process_tabblock_data(chamber: str, directory: str) -> None:
-    data_path = build_redistricting_data_directory(directory) + (
-        'redistricting_data_nodes_TX_nodes_TX_2020_tabblock_' +
-        dt.get_census_chamber_name(chamber) + '_contract0.parquet' if chamber in cm.CHAMBERS
-        else 'redistricting_data_nodes_TX_nodes_TX_2020_raw.parquet')
-
-    save_data_tablock_columns(chamber, directory, data_path)
-    save_filtered_data(chamber, directory, data_path)
 
 
 def load_block_equivalency_file(chamber: str, directory: str, plan: int) -> pd.DataFrame:
@@ -258,16 +300,20 @@ def sen20_percent_vector(df: pd.DataFrame) -> pd.Series:
 
 
 def build_statistics_vector_settings() -> list[tuple[str, Callable[[pd.DataFrame], pd.Series]]]:
+    return [(dt.build_election_filename_csv('PRES20', 'vector'), pres20_percent_vector),
+            (dt.build_election_filename_csv('SEN20', 'vector'), sen20_percent_vector)] + \
+            build_statistics_vector_group_settings(dt.O17) + build_statistics_vector_group_settings(dt.TOTAL) + \
+            build_statistics_vector_group_settings(dt.CVAP) + build_statistics_vector_group_settings(dt.C)
+
+
+def build_statistics_vector_group_settings(group) -> list[tuple[str, Callable[[pd.DataFrame], pd.Series]]]:
     return [
-        (dt.build_race_filename_csv('hisp', 'vector'), dt.hisp_percent),
-        (dt.build_race_filename_csv('black_hisp', 'vector'), dt.black_hisp_sum_percent),
-        (dt.build_race_filename_csv('black', 'vector'), dt.black_sum_percent),
-        (dt.build_race_filename_csv('white', 'vector'), dt.white_percent),
-        (dt.build_race_filename_csv('non_white', 'vector'), dt.non_white_percent),
-        (dt.build_election_filename_csv('PRES20', 'vector'), pres20_percent_vector),
-        (dt.build_election_filename_csv('SEN20', 'vector'), sen20_percent_vector),
-        ('o17_pop_vector.csv', dt.o17_pop),
-        ('total_pop_vector.csv', dt.total_pop)
+        (dt.build_race_filename_csv('hisp', group, 'vector'), lambda x: dt.hisp_percent(x, group)),
+        (dt.build_race_filename_csv('black', group, 'vector'), lambda x: dt.black_sum_percent(x, group)),
+        (dt.build_race_filename_csv('black_hisp', group, 'vector'), lambda x: dt.black_hisp_sum_percent(x, group)),
+        (dt.build_race_filename_csv('white', group, 'vector'), lambda x: dt.white_percent(x, group)),
+        (dt.build_race_filename_csv('non_white', group, 'vector'), lambda x: dt.non_white_percent(x, group)),
+        (dt.build_general_filename_csv(f'pop_{group}', 'vector'), lambda x: dt.pop(x, group)),
     ]
 
 
@@ -709,7 +755,7 @@ if __name__ == '__main__':
         t = Timer()
         t.start()
 
-        chamber = 'DCN'  # 'USCD'  #  'TXHD'  #
+        chamber = 'USCD'  #  'TXHD'  #  'DCN'  #
         root_directory = 'G:/rob/projects/election/rob/'
         plans_directory = build_plans_directory(root_directory)
 
@@ -722,23 +768,20 @@ if __name__ == '__main__':
             # analyze_proposed_plan_seed_assignments_v2(chamber, root_directory, plan)
             verify_graph(chamber, root_directory, plan)
 
-        if True:
+        if False:
             plans_metadata = load_plans_metadata(chamber, plans_directory)
             save_current_merged_plans(chamber, root_directory, plans_metadata, force=False)
 
         if True:
-            # process_tabblock_data(chamber, root_directory)
-            for chamber in ['DCN']:  # cm.CHAMBERS:
+            for chamber in ['DCN']:  # cm.CHAMBERS: # ['USCD']:  #
                 print(f"Chamber: {chamber}")
+                process_tabblock_data(chamber, root_directory)
                 update_plan_vectors(chamber, root_directory)
 
         if False:
             for chamber in cm.CHAMBERS:  # ['USCD']:  #
                 proposed_plans_metadata = load_plans_metadata(chamber, plans_directory)
                 save_graph_filtered(chamber, root_directory, proposed_plans_metadata)
-
-        if False:
-            save_plan_vectors(chamber, root_directory, 2101)
 
         if False:
             plans = [x.plan for x in load_plans_metadata(chamber, plans_directory).itertuples()]

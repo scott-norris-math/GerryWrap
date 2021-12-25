@@ -8,9 +8,17 @@ import pandas as pd
 from typing import Callable, Iterable, Optional
 
 import common as cm
+import data_transform as dt
 import proposed_plans as pp
 import simulation as si
+import simulation_analysis as sa
 from timer import Timer
+
+
+O17 = 'o17'
+TOTAL = 'total'
+CVAP = 'CVAP'
+C = 'C'
 
 
 def get_census_chamber_name(chamber: str) -> str:
@@ -41,7 +49,7 @@ def merge_plan_data(input_directories: Iterable[str], output_directory: str) -> 
 
 
 def determine_data_columns(df: pd.DataFrame) -> list[str]:
-    race_columns = [col for col in df.columns if (col.startswith('o17'))]
+    race_columns = [col for col in df.columns if (col.startswith(O17))]
     election_columns = [
         'President_2020_general_D_Biden',
         'President_2020_general_R_Trump',
@@ -51,55 +59,65 @@ def determine_data_columns(df: pd.DataFrame) -> list[str]:
     return cm.union(race_columns, election_columns)
 
 
-def o17_pop(df: pd.DataFrame) -> pd.Series:
-    return df['o17_pop']
+def pop(df: pd.DataFrame, group) -> pd.Series:
+    return df[f'{group}_pop']
 
 
-def total_pop(df: pd.DataFrame) -> pd.Series:
-    return df['total_pop']
+def hisp_percent(df: pd.DataFrame, group: str) -> pd.Series:
+    return df[hispanic_column('hisp_pop', group)] / df[f'{group}_pop']
 
 
-def hisp_percent(df: pd.DataFrame) -> pd.Series:
-    return df['o17_hisp_pop'] / df['o17_pop']
+def white_percent(df: pd.DataFrame, group: str) -> pd.Series:
+    return df[hispanic_column('nonhisp_white', group)] / df[f'{group}_pop']
 
 
-def white_percent(df: pd.DataFrame) -> pd.Series:
-    return df['o17_nonhisp_white'] / df['o17_pop']
+def non_white_percent(df: pd.DataFrame, group: str) -> pd.Series:
+    return 1 - white_percent(df, group)
 
 
-def non_white_percent(df: pd.DataFrame) -> pd.Series:
-    return 1 - white_percent(df)
+def black_sum_percent(df: pd.DataFrame, group: str) -> pd.Series:
+    if group in build_census_population_groups():
+        race_sum = black_sum(df, group)
+        return race_sum / df[f'{group}_pop']
+    elif group in build_cvap_population_groups():
+        return black_percent(df, group)
+    else:
+        raise NotImplementedError("Unknown population group")
 
 
-def black_sum_percent(df: pd.DataFrame) -> pd.Series:
-    race_sum = black_sum(df)
-    return race_sum / df['o17_pop']
+def black_percent(df: pd.DataFrame, group: str) -> pd.Series:
+    return df[f'calculated_{group}_black'] / df[f'{group}_pop']
 
 
-def black_percent(df: pd.DataFrame) -> pd.Series:
-    return df['black_o17_sum'] / df['o17_pop']
-
-
-def black_sum(df: pd.DataFrame) -> pd.Series:
-    entire_population_o17_columns = [col for col in df.columns
-                                     if (col.startswith('o17') and not col.startswith('o17_nonhisp'))]
-    race_pop_columns = [col for col in entire_population_o17_columns if 'black' in col]
+def black_sum(df: pd.DataFrame, group: str) -> pd.Series:
+    entire_population_group_columns = [col for col in df.columns if (col.startswith(group) and not col.startswith(hispanic_column('nonhisp', group)))]
+    race_pop_columns = [col for col in entire_population_group_columns if 'black' in col]
     return df[race_pop_columns].sum(axis=1)
 
 
-def black_hisp_sum_percent(df: pd.DataFrame) -> pd.Series:
-    race_sum = black_hisp_sum(df)
-    return race_sum / df['o17_pop']
+# ToDo: move logic for groups back to calling method
+def black_hisp_sum_percent(df: pd.DataFrame, group: str) -> pd.Series:
+    if group in build_census_population_groups():
+        race_sum = black_hisp_sum(df, group)
+        return race_sum / df[f'{group}_pop']
+    elif group in build_cvap_population_groups():
+        return black_hisp_percent(df, group)
+    else:
+        raise NotImplementedError("Unknown population group")
 
 
-def black_hisp_percent(df: pd.DataFrame) -> pd.Series:
-    return df['black_hisp_o17_sum'] / df['o17_pop']
+def black_hisp_percent(df: pd.DataFrame, group: str) -> pd.Series:
+    return df[f'calculated_{group}_black_hisp'] / df[f'{group}_pop']
 
 
-def black_hisp_sum(df: pd.DataFrame) -> pd.Series:
-    nonhisp_o17_columns = [col for col in df.columns if col.startswith('o17_nonhisp')]
-    race_nonhisp_o17_columns = [col for col in nonhisp_o17_columns if 'black' in col]
-    race_pop_columns = ['o17_hisp_pop'] + race_nonhisp_o17_columns
+def hispanic_column(suffix: str, group: str) -> str:
+    return suffix if group == TOTAL else f'{group}_{suffix}'
+
+
+def black_hisp_sum(df: pd.DataFrame, group: str) -> pd.Series:
+    nonhisp_columns = [col for col in df.columns if col.startswith(hispanic_column('nonhisp', group))]
+    race_nonhisp_columns = [col for col in nonhisp_columns if 'black' in col]
+    race_pop_columns = [hispanic_column('hisp_pop', group)] + race_nonhisp_columns
     race_sum = df[race_pop_columns].sum(axis=1)
     return race_sum
 
@@ -116,22 +134,43 @@ def sen20_percent(df: pd.DataFrame) -> pd.Series:
     return dem_votes / (dem_votes + rep_votes)
 
 
-def transform_racial_group_file_prefix(racial_group: str) -> str:
-    return {
-        'HVAP': "hisp",
-        'BVAP': "black",
-        'BHVAP': "black_hisp",
-        'WVAP': "white",
-        'NWVAP': "non_white"
-    }[racial_group]
+def build_census_population_groups() -> list[str]:
+    return [O17, TOTAL]
 
 
-def build_race_filename_prefix(race: str) -> str:
-    return race + '_perc'
+def build_cvap_population_groups() -> list[str]:
+    return [CVAP, C]
 
 
-def build_race_filename_csv(race: str, suffix: str = '') -> str:
-    return build_race_filename_prefix(race) + cm.build_suffix(suffix) + '.csv'
+def build_population_groups() -> list[str]:
+    return dt.build_census_population_groups() + dt.build_cvap_population_groups()
+
+
+def transform_racial_group_file_prefix(racial_group: str, population_group: str) -> tuple[str, str]:
+    return ({
+        'H': 'hisp',
+        'B': 'black',
+        'BH': 'black_hisp',
+        'W': 'white',
+        'NW': 'non_white'
+    }[racial_group], {
+        'VAP': 'o17',
+        'T': 'total',
+        'CVAP': 'cvap',
+        'C': 'c'
+    }[population_group])
+
+
+def build_race_filename_prefix(race: str, group: str) -> str:
+    return f'{race}_{group}_perc'
+
+
+def build_race_filename_csv(race: str, group: str, suffix: str = '') -> str:
+    return f'{build_race_filename_prefix(race, group)}{cm.build_suffix(suffix)}.csv'
+
+
+def build_general_filename_csv(prefix: str, suffix: str = '') -> str:
+    return f'{prefix}{cm.build_suffix(suffix)}.csv'
 
 
 def build_election_filename_prefix(election: str) -> str:
@@ -143,17 +182,20 @@ def build_election_filename_csv(election: str, suffix: str = '') -> str:
 
 
 def build_statistics_settings() -> list[tuple[str, Callable[[pd.DataFrame], pd.Series]]]:
+    return [(build_election_filename_prefix('PRES20'), pres20_percent),
+            (build_election_filename_prefix('SEN20'), sen20_percent)] + \
+            build_statistics_group_settings(O17) + build_statistics_group_settings(TOTAL) + \
+            build_statistics_group_settings(CVAP) + build_statistics_group_settings(C)
+
+
+def build_statistics_group_settings(group: str) -> list[tuple[str, Callable[[pd.DataFrame], pd.Series]]]:
     return [
-        (build_race_filename_prefix('hisp'), hisp_percent),
-        (build_race_filename_prefix('black_hisp'), black_hisp_percent),
-        (build_race_filename_prefix('black'), black_percent),
-        (build_race_filename_prefix('white'), white_percent),
-        (build_race_filename_prefix('non_white'), non_white_percent),
-        (build_election_filename_prefix('PRES20'), pres20_percent),
-        (build_election_filename_prefix('SEN20'), sen20_percent),
-        ('o17_pop', o17_pop),
-        ('total_pop', total_pop)
-    ]
+        (build_race_filename_prefix('hisp', group), lambda x: hisp_percent(x, group)),
+        (build_race_filename_prefix('black', group), lambda x: black_percent(x, group)),
+        (build_race_filename_prefix('black_hisp', group), lambda x: black_hisp_percent(x, group)),
+        (build_race_filename_prefix('white', group), lambda x: white_percent(x, group)),
+        (build_race_filename_prefix('non_white', group), lambda x: non_white_percent(x, group)),
+        (f'pop_{group}', lambda x: pop(x, group))]
 
 
 def build_canonical_assignments_list(assignments: list[tuple[int, int]]) -> list[list[int]]:
@@ -165,7 +207,7 @@ def build_canonical_assignments_list(assignments: list[tuple[int, int]]) -> list
     return partition_list
 
 
-def load_filtered_redistricting_data(directory: str, redistricting_data_filename: str,
+def load_filtered_redistricting_data(directory: str, redistricting_data_filename: str, cvap_filename: str,
                                      additional_columns: list[str] = []) -> pd.DataFrame:
     redistricting_data_directory = pp.build_redistricting_data_directory(directory)
     redistricting_data_path = f'{redistricting_data_directory}{redistricting_data_filename}'
@@ -179,18 +221,115 @@ def load_filtered_redistricting_data(directory: str, redistricting_data_filename
     # redistricting data stored at the census block level has some different column names
     si.fix_election_columns_text(node_data)
 
-    node_data['black_o17_sum'] = black_sum(node_data)
-    node_data['black_hisp_o17_sum'] = black_hisp_sum(node_data)
+    calculated_columns = []
+    for group in build_census_population_groups():
+        column = f'calculated_{group}_black'
+        node_data[column] = black_sum(node_data, group)
+        calculated_columns.append(column)
+        column = f'calculated_{group}_black_hisp'
+        node_data[column] = black_hisp_sum(node_data, group)
+        calculated_columns.append(column)
+
     filtered_node_data = node_data.filter(items=[
-        'geoid',
-        'President_2020_general_D_Biden', 'President_2020_general_R_Trump',
-        'USSen_2020_general_D_Hegar', 'USSen_2020_general_R_Cornyn',
-        'o17_hisp_pop', 'black_o17_sum', 'black_hisp_o17_sum', 'o17_pop',
-        'o17_nonhisp_white', 'total_pop'
-    ] + additional_columns)
+                                                    'geoid',
+                                                    'President_2020_general_D_Biden', 'President_2020_general_R_Trump',
+                                                    'USSen_2020_general_D_Hegar', 'USSen_2020_general_R_Cornyn',
+                                                    'total_pop', 'o17_pop', 'nonhisp_pop',
+                                                    'o17_hisp_pop', 'o17_nonhisp_white',
+                                                    'hisp_pop', 'nonhisp_white'
+                                                ] + calculated_columns + additional_columns)
     filtered_node_data.set_index('geoid', drop=False, inplace=True)
+
+    cvap_data = pd.read_parquet(f'{redistricting_data_directory}{cvap_filename}')
+    filtered_node_data = filtered_node_data.join(cvap_data, how='inner')
+
     filtered_node_data.sort_index(inplace=True)
+
     return filtered_node_data
+
+
+def build_cvap_county_countyvtd_data_path_prefix(directory: str) -> str:
+    return f'{pp.build_redistricting_data_directory(directory)}{build_cvap_county_countyvtd_data_filename_prefix()}'
+
+
+def build_cvap_county_countyvtd_data_filename_prefix() -> str:
+    return 'cvap_cty_cntyvtd'
+
+
+def build_cvap_data_path_prefix(directory: str, chamber: str, plan: int) -> str:
+    return f'{pp.build_redistricting_data_directory(directory)}{build_cvap_data_filename_prefix(chamber, plan)}'
+
+
+def build_cvap_data_filename_prefix(chamber: str, plan: int) -> str:
+    return f'cvap_{chamber}_{plan}'
+
+
+def save_cvap_county_countyvtd_data(directory: str) -> None:
+    cvap_data = pp.load_cvap_data(directory)
+    block_ids = list(cvap_data.index.values)
+
+    chamber = 'USCD'
+    geoid_to_node_ids = match_block_ids(directory, chamber, block_ids)
+
+    save_cvap_data_impl(cvap_data, geoid_to_node_ids, build_cvap_county_countyvtd_data_path_prefix(directory))
+
+
+def save_cvap_data(directory: str, chamber: str, plan: int) -> None:
+    cvap_data = pp.load_cvap_data(directory)
+    geoid_to_node_assignments = build_geoid_to_node_ids(directory, chamber, plan)
+    cvap_data = cvap_data[cvap_data.index.isin(geoid_to_node_assignments)]
+    print(f"Matched: {len(cvap_data)}")
+    save_cvap_data_impl(cvap_data, geoid_to_node_assignments, build_cvap_data_path_prefix(directory, chamber, plan))
+
+
+def build_geoid_to_node_ids(directory: str, chamber: str, plan: int) -> dict[str, str]:
+    seeds_directory = cm.build_seeds_directory(directory)
+    seed_filename_prefix = sa.build_seed_filename_prefix(chamber, 'cntyvtd', plan)
+    dual_graph_path_prefix = f'{seeds_directory}graph_{seed_filename_prefix}'
+    dual_graph = nx.read_gpickle(dual_graph_path_prefix + '.gpickle')
+    return build_geoid_to_node_ids_from_graph(dual_graph)
+
+
+def build_geoid_to_node_ids_from_graph(graph: nx.Graph):
+    return {geoid: x for x, y in graph.nodes.items() for geoid in y['node_geoids'].split(",")}
+
+
+def save_cvap_data_impl(cvap_data: pd.DataFrame, geoid_to_node_ids: dict[str, str], output_path_prefix: str) -> None:
+    cvap_data['node_id'] = [geoid_to_node_ids[x] for x in list(cvap_data.index.values)]
+    cvap_groups = cvap_data.groupby('node_id')
+    cvap_grouped_data = cvap_groups.sum()
+    cvap_grouped_data.index.rename('geoid', inplace=True)
+    cvap_grouped_data.sort_values(by=['geoid'], inplace=True)
+
+    cvap_grouped_data.to_csv(f'{output_path_prefix}.csv')
+    cvap_grouped_data.to_parquet(f'{output_path_prefix}.parquet')
+
+
+def match_block_ids(directory:str, chamber: str, block_ids: list[str]):
+    settings = cm.build_settings(chamber)
+    seeds_directory = cm.build_seeds_directory(directory)
+    dual_graph = nx.read_gpickle(seeds_directory + settings.dual_graph_filename)
+
+    keys = list(dual_graph.nodes.keys())
+    counties = {x for x in keys if len(x) == 3}
+    vtds = {x for x in keys if len(x) == 9}
+    print(f"{len(keys)} {len(counties)} {len(vtds)}")
+
+    geoid_components = [(x, x[0:3]) for x in block_ids]
+
+    redistricting_data = sa.load_redistricting_data(directory)
+
+    county_vtd_lookup = {x: y for x, y in zip(redistricting_data['geoid'], redistricting_data['cntyvtd'])}
+    geoid_county_matches = [(x, y) for x, y in geoid_components if y in counties]
+    geoid_vtd_matches = [(x, county_vtd_lookup[x]) for x, _ in geoid_components if county_vtd_lookup[x] in vtds]
+    non_matches = [x for x, y in geoid_components if not (y in counties or county_vtd_lookup[x] in vtds)]
+    matches = {x: y for x, y in geoid_county_matches + geoid_vtd_matches}
+    print(f"{len(block_ids)} {len(geoid_county_matches)} {len(geoid_vtd_matches)} {len(matches)} {len(non_matches)}")
+
+    if any(non_matches):
+        raise RuntimeError("Not all blocks matched")
+
+    return matches
 
 
 def combine_and_fix_redistricting_data_file(directory: str) -> None:
@@ -206,10 +345,10 @@ def combine_and_fix_redistricting_data_file(directory: str) -> None:
     combined.to_csv(output_prefix + '.csv', index=False)
 
 
-def save_ensemble_matrices(chamber: str, directory: str, redistricting_data_filename: str, graph: nx.Graph,
-                           ensemble_description: str, use_unique_plans, file_numbers: Optional[Iterable[int]],
-                           force: bool) -> None:
-    node_data = load_filtered_redistricting_data(directory, redistricting_data_filename)
+def save_ensemble_matrices(chamber: str, directory: str, redistricting_data_filename: str, cvap_filename,
+                           graph: nx.Graph, ensemble_description: str, use_unique_plans,
+                           file_numbers: Optional[Iterable[int]], force: bool) -> None:
+    node_data = load_filtered_redistricting_data(directory, redistricting_data_filename, cvap_filename)
     statistics_settings = build_statistics_settings()
     ensemble_directory = cm.build_ensemble_directory(directory, ensemble_description)
 
@@ -307,20 +446,22 @@ if __name__ == '__main__':
             ensemble_directory = cm.build_ensemble_directory(directory, settings.ensemble_description)
             save_unique_plans(ensemble_directory, plans)
 
+        if False:
+            save_cvap_data(directory, 'DCN', 93173)
+
         if True:
             seeds_directory = cm.build_seeds_directory(directory)
             dual_graph = nx.read_gpickle(seeds_directory + settings.dual_graph_filename)
 
-            if False:
-                ensemble_directory = cm.build_ensemble_directory(directory, settings.ensemble_description)
-                convert_to_csv(ensemble_directory, 'total_pop')
-                convert_to_csv(ensemble_directory, 'o17_pop')
-            else:
-                save_ensemble_matrices(chamber, directory, settings.redistricting_data_filename, dual_graph,
-                                       settings.ensemble_description, False, range(0, settings.number_files), True)  # False, None)  #
+            save_ensemble_matrices(chamber, directory, settings.redistricting_data_filename,
+                                   settings.cvap_data_filename, dual_graph, settings.ensemble_description,
+                                   False, range(0, settings.number_files),  # 1), #
+                                   True)  # False, None)  #
+            ensemble_directory = cm.build_ensemble_directory(directory, settings.ensemble_description)
+            for population_group in build_population_groups():
+                convert_to_csv(ensemble_directory, f'pop_{population_group}')
 
         if False:
-            chamber = 'USCD'
             ensemble_description_1 = f'{chamber}_random_seed_2'
             ensemble_description_2 = f'{chamber}_random_seed_2Copy'
             ensemble_directory_1 = cm.build_ensemble_directory(directory, ensemble_description_1)
@@ -334,7 +475,6 @@ if __name__ == '__main__':
                                    cm.load_numpy_compressed(statistics_path_2), sort)
 
         if False:
-            chamber = 'TXSN'  # 'USCD'  #
             source = ''
             raw_input_directory = '/home/user/election/MeetingPrep/PostMortem/Plots/RawInput' + source + '/'
             root_directory = '/home/user/election/MeetingPrep/PostMortem/Plots/Input' + source + '/'
@@ -357,5 +497,6 @@ if __name__ == '__main__':
         t.stop()
 
         print('done')
+
 
     main()

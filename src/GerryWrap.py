@@ -519,8 +519,8 @@ def seats_votes_ensemble(ensemble_transposed: np.ndarray, title: str, statewide:
 
 def mean_median_distribution(ensemble: np.ndarray, instance: np.ndarray,
                              title: str = "Distribution of Mean-Median Scores", xlabel: str = None) -> Any:
-    mme = np.mean(ensemble, axis=1) - np.median(ensemble, axis=1)
-    mmi = np.mean(instance) - np.median(instance)
+    mme = np.median(ensemble, axis=1) - np.mean(ensemble, axis=1)
+    mmi = np.median(instance) - np.mean(instance)
 
     mmmedian = np.median(mme)
     mmmean = np.mean(mme)
@@ -554,7 +554,7 @@ def mean_median_distribution(ensemble: np.ndarray, instance: np.ndarray,
 
 
 def mean_median_partisan_bias(ensemble_transposed: np.ndarray, have_actual: bool = True,
-                              comparison_label: str = "Enacted Districts"):
+                              comparison_label: str = "Enacted Districts") -> Any:
     # get shape of data
     districts, chainlength = np.shape(ensemble_transposed)
     hmid = 1 + (districts - 1) / 2.0
@@ -579,50 +579,51 @@ def mean_median_partisan_bias(ensemble_transposed: np.ndarray, have_actual: bool
         number_seats[1, j] = np.sum(seatsvotes2 <= 0.5)
 
     # things we need to plot
-    vdiffs = majority_vs[0, :] - majority_vs[1, :]
-    mvdiff = np.median(vdiffs)
-    cvdiff = vdiffs[0]
+    mean_medians_ensemble = majority_vs[1, :] - majority_vs[0, :]
+    mvdiff = np.median(mean_medians_ensemble)
+    cvdiff = mean_medians_ensemble[0]
 
     # for making it look nice
-    vdmin = min(vdiffs)
-    vdmax = max(vdiffs)
+    vdmin = min(mean_medians_ensemble)
+    vdmax = max(mean_medians_ensemble)
     vbinedge_min = np.floor(vdmin)
     vbinedge_max = np.ceil(vdmax)
     vbinbounds = np.arange(vbinedge_min, vbinedge_max + .01, .01)
     vdbuff = (vdmax - vdmin) * .025
 
-    vhist, vedges = np.histogram(vdiffs, bins=vbinbounds)
+    vhist, vedges = np.histogram(mean_medians_ensemble, bins=vbinbounds)
     if have_actual:
-        print("MM Enacted Plan Percentile = ", stats.percentileofscore(vdiffs, cvdiff))
+        print("MM Enacted Plan Percentile = ", stats.percentileofscore(mean_medians_ensemble, cvdiff))
         print(majority_vs[:, 0])
         print(mvdiff)
 
     # things we need to plot
-    ndiffs = number_seats[0, :] - number_seats[1, :]
-    mndiff = np.median(ndiffs)
-    cndiff = ndiffs[0]
+    partisan_biases_ensemble = number_seats[0, :] - number_seats[1, :]
+    mndiff = np.median(partisan_biases_ensemble)
+    cndiff = partisan_biases_ensemble[0]
 
     # for making it look nice
-    ndmin = min(ndiffs)
-    ndmax = max(ndiffs)
+    ndmin = min(partisan_biases_ensemble)
+    ndmax = max(partisan_biases_ensemble)
     nbinedge_min = np.floor(ndmin)
     nbinedge_max = np.ceil(ndmax)
     nbinbounds = np.arange(nbinedge_min - 0.5, nbinedge_max + 0.5)
     ndbuff = (ndmax - ndmin) * .01
 
-    nhist, nedges = np.histogram(ndiffs, bins=nbinbounds)
+    nhist, nedges = np.histogram(partisan_biases_ensemble, bins=nbinbounds)
     if have_actual:
-        print("PB Enacted Plan Percentile = ", stats.percentileofscore(ndiffs, cndiff))
+        print("PB Enacted Plan Percentile = ", stats.percentileofscore(partisan_biases_ensemble, cndiff))
         print(number_seats[:, 0])
         print(mndiff)
-        print(np.count_nonzero(ndiffs == cndiff))
-        print(np.count_nonzero(ndiffs < cndiff))
-        print(min(ndiffs))
+        print(np.count_nonzero(partisan_biases_ensemble == cndiff))
+        print(np.count_nonzero(partisan_biases_ensemble < cndiff))
+        print(min(partisan_biases_ensemble))
 
+    # Mean Median
     myfigure = plt.figure(figsize=(6.5, 3.5))
     axes = plt.subplot(121)
 
-    plt.hist(vdiffs, bins=vbinbounds, color="xkcd:dark blue", **{'alpha': 0.3})
+    plt.hist(mean_medians_ensemble, bins=vbinbounds, color="xkcd:dark blue", **{'alpha': 0.3})
     plt.axvline(x=mvdiff, color="green", ls='--', lw=2.5, ymax=0.75, label="Ensemble Median")
     if have_actual:
         plt.axvline(x=cvdiff, color="purple", ls='--', lw=2.5, ymax=0.75, label=comparison_label)
@@ -636,13 +637,14 @@ def mean_median_partisan_bias(ensemble_transposed: np.ndarray, have_actual: bool
         left=False,  # ticks along the bottom edge are off
         right=False,  # ticks along the top edge are off
         labelleft=False)  # labels along the bottom edge are off
-    plt.xlabel("Voteshare Difference for Majority % (D-R)")
+    plt.xlabel("Voteshare Difference for Majority % (R-D)")
     plt.ylabel("Relative Frequency")
     plt.title('"Mean-Median" Score')
     plt.legend(loc="upper center")
 
+    # Partisan Bias
     plt.subplot(122)
-    plt.hist(ndiffs, bins=nbinbounds, color="xkcd:dark blue", **{'alpha': 0.3})
+    plt.hist(partisan_biases_ensemble, bins=nbinbounds, color="xkcd:dark blue", **{'alpha': 0.3})
     plt.axvline(x=mndiff, color="green", ls='--', lw=2.5, ymax=0.75, label="Ensemble Median")
     if have_actual:
         plt.axvline(x=cndiff, color="purple", ls='--', lw=2.5, ymax=0.75, label=comparison_label)
@@ -846,8 +848,8 @@ def partisan_metrics_hist2D(ensemble_matrix: np.ndarray, plan_vector: np.ndarray
     else:
         myfigure = plot_ensemble_matrix_votes_seats(hmid, number_points, ensemble_matrix)
 
-    actual_vote_diff, actual_seat_diff = calculate_plan_votes_seats(districts, hmid, plan_vector)
-    previous_point = plt.plot([actual_vote_diff], [actual_seat_diff], 'rs', label=comparison_label)[0]
+    mean_median, partisan_bias = calculate_mean_median_partisan_bias(districts, hmid, plan_vector)
+    previous_point = plt.plot([mean_median], [partisan_bias], 'rs', label=comparison_label)[0]
 
     plt.legend(loc='best')
 
@@ -860,19 +862,18 @@ def partisan_metrics_hist2D_all(ensemble_matrix: np.ndarray, plan_vectors: dict[
     hmid = 1 + (districts - 1) / 2.0
 
     heights: dict[int, float] = defaultdict(float)
-    values = [(x, calculate_plan_votes_seats(districts, hmid, y)) for x, y in plan_vectors.items()]
+    values = [(x, calculate_mean_median_partisan_bias(districts, hmid, y)) for x, y in plan_vectors.items()]
     values = sorted(values, key=lambda x: (x[1][1], x[1][0]))
 
-    for plan_number, (actual_vote_diff, actual_seat_diff) in values:
-        plt.plot([actual_vote_diff], [actual_seat_diff], 'rs')
+    for plan_number, (mean_median, partisan_bias) in values:
+        plt.plot([mean_median], [partisan_bias], 'rs')
         if plan_number in height_restarts:
-            heights[actual_seat_diff] = 0
-        plt.annotate(str(plan_number), (actual_vote_diff + .001, actual_seat_diff + (heights[actual_seat_diff]) + .15))
-        heights[actual_seat_diff] = heights[actual_seat_diff] + .23
+            heights[partisan_bias] = 0
+        plt.annotate(str(plan_number), (mean_median + .001, partisan_bias + (heights[partisan_bias]) + .15))
+        heights[partisan_bias] = heights[partisan_bias] + .23
 
 
-def calculate_plan_votes_seats(districts: int, hmid: float, plan_vector: np.ndarray) -> tuple[float, int]:
-    # information for the instance
+def calculate_mean_median_partisan_bias(districts: int, hmid: float, plan_vector: np.ndarray) -> tuple[float, int]:
     actual_race_results = sorted(plan_vector, reverse=True)
     actual_mean_voteshare = np.mean(actual_race_results)
     actual_seatsvotes1 = actual_mean_voteshare - np.array(actual_race_results) + 0.5
@@ -883,18 +884,18 @@ def calculate_plan_votes_seats(districts: int, hmid: float, plan_vector: np.ndar
             actual_seatsvotes1[round(hmid - 0.5) - 1] + actual_seatsvotes1[round(hmid - 0.5) - 1])
     actual_majority_vs2 = actual_seatsvotes2[round(hmid) - 1] if districts % 2 != 0 else 0.5 * (
             actual_seatsvotes2[round(hmid - 0.5) - 1] + actual_seatsvotes2[round(hmid - 0.5) - 1])
-    actual_vote_diff = actual_majority_vs1 - actual_majority_vs2
+    mean_median = actual_majority_vs2 - actual_majority_vs1
 
     # What is the percentage nec. for a majority?
     actual_number_seats1 = np.count_nonzero(actual_seatsvotes1 <= 0.5)
     actual_number_seats2 = np.count_nonzero(actual_seatsvotes2 <= 0.5)
-    actual_seat_diff = actual_number_seats1 - actual_number_seats2
+    partisan_bias = actual_number_seats1 - actual_number_seats2
 
-    return actual_vote_diff, actual_seat_diff
+    return mean_median, partisan_bias
 
 
 def plot_ensemble_matrix_votes_seats(hmid: float, number_points: Optional[int], ensemble_matrix: np.ndarray) -> Any:
-    vote_diffs, seat_diffs = calculate_ensemble_votes_seats(hmid, ensemble_matrix)
+    vote_diffs, seat_diffs = calculate_ensemble_mean_median_partisan_biases(hmid, ensemble_matrix)
 
     myfigure = plt.figure(figsize=(6.5, 5))
 
@@ -918,7 +919,7 @@ def plot_ensemble_matrix_votes_seats(hmid: float, number_points: Optional[int], 
     return myfigure
 
 
-def calculate_ensemble_votes_seats(hmid: float, ensemble: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+def calculate_ensemble_mean_median_partisan_biases(hmid: float, ensemble: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     chainlength, districts = np.shape(ensemble)
 
     # logic for odd or even numbers of districts
@@ -965,12 +966,12 @@ def calculate_ensemble_votes_seats(hmid: float, ensemble: np.ndarray) -> tuple[n
             number_seats[1, j] = lastseat2 + 1 + (0.5 - v0) / (v1 - v0)
 
     #   Voteshares
-    vote_diffs = majority_vs[0, :] - majority_vs[1, :]
+    mean_medians = majority_vs[1, :] - majority_vs[0, :]
 
     #   Number of Seats
-    seat_diffs = number_seats[0, :] - number_seats[1, :]
+    partisan_biases = number_seats[0, :] - number_seats[1, :]
 
-    return vote_diffs, seat_diffs
+    return mean_medians, partisan_biases
 
 
 def set_point_colors(point_colors: dict[int, str], districts: Iterable[int], color: str) -> None:

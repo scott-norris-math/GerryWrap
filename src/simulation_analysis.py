@@ -498,9 +498,10 @@ if __name__ == '__main__':
 
             for chamber in ['DCN']:  # cm.CHAMBERS:
                 print(chamber)
-                for plan in pp.get_valid_plans(chamber, pp.build_plans_directory(directory)) - {2100}:
-                    if plan < 93173:
-                        return
+                for plan in sorted(pp.get_valid_plans(chamber, pp.build_plans_directory(directory)),
+                                   reverse=True):
+                    # if plan < 93173:
+                    #    return
 
                     print(plan)
                     save_seed(chamber, directory, geographic_unit, plan, redistricting_data)

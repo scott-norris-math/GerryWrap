@@ -9,6 +9,8 @@ import pickle
 from typing import Iterable, Callable, Any, Optional
 import zipfile
 
+import data_transform as dt
+
 
 CHAMBERS = ['USCD', 'TXSN', 'TXHD']
 
@@ -284,8 +286,8 @@ def get_current_ensemble(chamber: str) -> tuple[str, int]:
         seed_description = '2176_product'
         ensemble_number = 1
     elif chamber == 'DCN':
-        seed_description = '83605'
-        ensemble_number = 2
+        seed_description = '93173'  # '83605'
+        ensemble_number = 1  # 2
     else:
         raise RuntimeError("Unknown chamber")
 
@@ -300,17 +302,20 @@ def build_settings(chamber: str) -> Dict:
         settings.ensemble_description = f'{chamber}_{plan}_product_1'
     elif chamber == 'TXSN':
         settings = build_TXSN_random_seed_simulation_settings()
+        settings.cvap_data_filename = f'{dt.build_cvap_county_countyvtd_data_filename_prefix()}.parquet'
         settings.number_files = 7
         settings.ensemble_description = 'TXSN_random_seed_2'
     elif chamber == 'USCD':
         settings = build_USCD_random_seed_simulation_settings()
+        settings.cvap_data_filename = f'{dt.build_cvap_county_countyvtd_data_filename_prefix()}.parquet'
         settings.number_files = 15
         settings.ensemble_description = 'USCD_random_seed_2'
     elif chamber == 'DCN':
-        plan = 83605
+        plan = 93173  # 83605  #
         settings = build_proposed_plan_simulation_settings(chamber, plan)
-        settings.number_files = 200
-        settings.ensemble_description = f'{chamber}_{plan}_2'
+        settings.cvap_data_filename = dt.build_cvap_data_filename_prefix('DCN', plan) + '.parquet'
+        settings.number_files = 96  # 150  # 100
+        settings.ensemble_description = f'{chamber}_{plan}_1'  # '2
 
     return settings
 
@@ -334,6 +339,7 @@ def build_TXSN_random_seed_simulation_settings() -> Dict:
 def build_USCD_random_seed_simulation_settings() -> Dict:
     settings = Dict()
     settings.dual_graph_filename = 'graph_TX_2020_cntyvtd_USCD_seed_0207.gpickle'
+    settings.redistricting_data_filename = f'nodes_TX_2020_cntyvtd_cd.csv'
     settings.epsilon = determine_population_limit('USCD')
     return settings
 

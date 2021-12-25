@@ -170,7 +170,7 @@ def load_matched_intersection_sizes(ensemble_directory: str, suffix: str = '') -
     return np.load(path, allow_pickle=True)['arr_0']
 
 
-def calculate_number_intersections(intersection_sizes: np.ndarray) -> int:
+def calculate_intersection_sizes_sum(intersection_sizes: np.ndarray) -> int:
     return np.trace(intersection_sizes)
 
 
@@ -190,7 +190,7 @@ def save_matched_plan_sizes(ensemble_directory: str, matched_intersection_sizes:
 
 def load_matched_plan_sizes(ensemble_directory: str, suffix: str = '') -> np.ndarray:
     path = build_matched_plan_sizes_path(ensemble_directory, suffix)
-    return np.load(path)['arr_0']
+    return cm.load_numpy_compressed(path)
 
 
 def calculate_symmetric_difference_sizes(matched_intersections_sizes: np.ndarray) -> np.ndarray:
@@ -201,7 +201,7 @@ def calculate_symmetric_difference_sizes(matched_intersections_sizes: np.ndarray
         if x % 100000 == 0:
             print(x)
 
-        symmetric_difference_sizes[x] = total_weight - calculate_number_intersections(
+        symmetric_difference_sizes[x] = total_weight - calculate_intersection_sizes_sum(
             matched_intersections_sizes[x].todense())
     return symmetric_difference_sizes
 
@@ -213,7 +213,7 @@ def save_symmetric_difference_sizes(ensemble_directory: str, symmetric_differenc
 
 def load_symmetric_difference_sizes(ensemble_directory: str, suffix: str = '') -> np.ndarray:
     path = build_symmetric_difference_sizes_path(ensemble_directory, suffix)
-    return np.load(path)['arr_0']
+    return cm.load_numpy_compressed(path)
 
 
 def build_and_plot_random_distances(plans: np.ndarray) -> None:
@@ -300,19 +300,24 @@ def plot_beta(data: Iterable[float]) -> None:
     plt.show()
 
 
-def build_vector(graph: nx.Graph, column: str) -> np.array:
+def build_vector(graph: nx.Graph, column: str) -> np.ndarray:
     data = [(x, y[column]) for x, y in graph.nodes.items()]
     return np.array([y for _, y in sorted(data, key=lambda x: x[0])])
 
 
-def save_matching_files(chamber: str, directory: str, suffix: str) -> None:
+def save_matching_files(chamber: str, directory: str) -> None:
     settings = cm.build_settings(chamber)
     ensemble_directory = cm.build_ensemble_directory(directory, settings.ensemble_description)
 
     # plans = cm.load_plans_from_path(f'{ensemble_directory}unique_plans.npz')
     plans = cm.load_plans_from_files(directory, settings.ensemble_description, range(0, settings.number_files))
 
-    if chamber in cm.CHAMBERS:
+    if chamber == 'USCD':
+        plans = plans + 1
+
+    suffix = 'total_pop'
+
+    if chamber in set(cm.CHAMBERS) - {'USCD'}:
         plan = pp.build_final_plan(chamber)
         census_chamber_name = dt.get_census_chamber_name(chamber)
         graph = si.load_plan_seed_with_data(chamber, directory, plan, [census_chamber_name])
@@ -322,7 +327,7 @@ def save_matching_files(chamber: str, directory: str, suffix: str) -> None:
         graph = nx.read_gpickle(seeds_directory + settings.dual_graph_filename)
         reference_plan = plans[0]
 
-    node_weights = build_vector(graph, 'total_pop')
+    node_weights = build_vector(graph, suffix)
     value_type = 'uint'
 
     save_intersection_sizes(ensemble_directory, reference_plan, plans, node_weights, value_type, suffix)
@@ -332,10 +337,13 @@ def save_matching_files(chamber: str, directory: str, suffix: str) -> None:
     matchings = load_matchings(ensemble_directory, suffix)
 
     save_matched_intersection_sizes(ensemble_directory, matchings, intersection_sizes, value_type, suffix)
+    del matchings
+    del intersection_sizes
     matched_intersections_sizes = load_matched_intersection_sizes(ensemble_directory, suffix)
 
     symmetric_difference_sizes = calculate_symmetric_difference_sizes(matched_intersections_sizes)
     save_symmetric_difference_sizes(ensemble_directory, symmetric_difference_sizes, suffix)
+    del symmetric_difference_sizes
 
     save_matched_plan_sizes(ensemble_directory, matched_intersections_sizes, value_type, suffix)
 
@@ -368,23 +376,23 @@ if __name__ == '__main__':
     def main() -> None:
         directory = 'G:/rob/projects/election/rob/'
 
-        if True:
-            chamber = 'DCN'
-            suffix = 'total_pop'
-            save_matching_files(chamber, directory, suffix)
+        chamber = 'DCN'
 
+        if True:
+            save_matching_files(chamber, directory)
+
+        if False:
+            suffix = 'total_pop'
             settings = cm.build_settings(chamber)
             ensemble_directory = cm.build_ensemble_directory(directory, settings.ensemble_description)
 
-            matched_plan_sizes = load_matched_plan_sizes(ensemble_directory, suffix)
+            symmetric_difference_sizes = load_symmetric_difference_sizes(ensemble_directory, suffix)
+            plt.hist(symmetric_difference_sizes, bins = 200)
 
-            plt.plot(distances)
+            # plot_distances_skewnormal(total_weight, symmetric_difference_sizes)
+            # plot_distances_beta(total_weight, symmetric_difference_sizes)
+
             plt.show()
-
-            # plot_distances_skewnormal(number_nodes, distances)
-            plot_distances_beta(number_nodes, symmetric_difference_sizes)
-
-            # build_and_plot_random_distances(plans)
 
 
     main()
