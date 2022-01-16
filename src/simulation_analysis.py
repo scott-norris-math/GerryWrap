@@ -22,12 +22,14 @@ from timer import Timer
 
 
 def load_redistricting_data(directory: str) -> pd.DataFrame:
+    print("Loading Redistricting Data - Start")
     redistricting_data_directory = pp.build_redistricting_data_directory(directory)
     data = pd.read_parquet(
         f'{redistricting_data_directory}redistricting_data_nodes_TX_nodes_TX_2020_raw.parquet')
     data['cnty'] = [x[-3:] for x in data['cnty']]
     data['geoid'] = [x[2:] for x in data['geoid']]
     data['polygon'] = data['polygon'].apply(sh.wkt.loads)
+    print("Loading Redistricting Data - End")
     return data
 
 
@@ -47,7 +49,7 @@ def assign_plan_districts(chamber: str, directory: str, data: pd.DataFrame, plan
 
 def build_node_data(data: pd.DataFrame, geographic_unit: str) -> pd.DataFrame:
     def determine_node_ids(data: pd.DataFrame, geographic_unit: str) -> list[str]:
-        def determine_whole_counties(data: pd.DataFrame):
+        def determine_whole_counties(data: pd.DataFrame) -> set[str]:
             county_districts = set(zip(data['cnty'], data['district']))
             county_groups = cm.groupby_project(list(county_districts), lambda x: x[0], lambda x: x[1])
             return {x for x, y in county_groups if len(y) == 1}
@@ -71,7 +73,7 @@ def build_node_data(data: pd.DataFrame, geographic_unit: str) -> pd.DataFrame:
         return [build_node_id(x, y, z, whole_counties, non_whole_levels) for x, y, z in
                 zip(data['cnty'], data[geographic_unit], data['district'])]
 
-    def handle_non_numeric_columns(group, state: dict[str, Any]):
+    def handle_non_numeric_columns(group: pd.DataFrame, state: dict[str, Any]) -> dict[str, str]:
         group_number = state['group_number']
         if group_number % 1000 == 0:
             print(f"Building Node: {group_number}")
@@ -172,6 +174,21 @@ def build_dual_graph(chamber: str, node_data: pd.DataFrame) -> nx.Graph:
 
     # TODO: check for number of connected components and raise error
     return graph
+
+
+def load_plan_dual_graph(chamber: str, directory: str, plan: int) -> nx.Graph:
+    seeds_directory = cm.build_seeds_directory(directory)
+    seed_filename_prefix = build_seed_filename_prefix(chamber, 'cntyvtd', plan)
+    dual_graph_path_prefix = f'{seeds_directory}graph_{seed_filename_prefix}'
+    dual_graph = nx.read_gpickle(dual_graph_path_prefix + '.gpickle')
+    return dual_graph
+
+
+def load_settings_dual_graph(chamber: str, directory: str) -> nx.Graph:
+    settings = cm.build_settings(chamber)
+    seeds_directory = cm.build_seeds_directory(directory)
+    dual_graph = nx.read_gpickle(seeds_directory + settings.dual_graph_filename)
+    return dual_graph
 
 
 def add_new_districts(graph: nx.Graph, current_number_districts: int, new_districts: int, node_data: pd.DataFrame) \
@@ -295,7 +312,7 @@ def build_region_indices_path(ensemble_directory: str) -> str:
 
 
 def calculate_defects(dual_graph: nx.Graph, counties: set[str], whole_targets: dict[str, int],
-                      intersect_targets: dict[str, int], plans: np.ndarray):
+                      intersect_targets: dict[str, int], plans: np.ndarray) -> list[int]:
     defects = []
     for i, plan in enumerate(plans):
         if i % 1000 == 0:
@@ -308,7 +325,7 @@ def calculate_defects(dual_graph: nx.Graph, counties: set[str], whole_targets: d
 
 
 def calculate_plan_defect(dual_graph: nx.Graph, counties: set[str], whole_targets: dict[str, int],
-                          intersect_targets: dict[str, int], plan):
+                          intersect_targets: dict[str, int], plan: np.ndarray) -> int:
     assignment = cm.build_assignment(dual_graph, plan)
     county_district_graph = si.build_county_district_graph(dual_graph, assignment, whole_targets, intersect_targets)
 
@@ -347,7 +364,7 @@ def save_unique_region_plans(directory: str, ensemble_description: str, dual_gra
     print(f"Indices in Components: {len(set(sum(region_indices_lookup.values(), [])))}")
     cm.save_pickle(build_region_indices_path(ensemble_directory), region_indices_lookup)
 
-    plans = cm.load_plans_from_file(directory, ensemble_description, 'unique_plans.npz')
+    plans = cm.load_plans_from_file(directory, ensemble_description, 'unique_plans.npz', 0)
 
     print(f'{len(plans)} {max(plans[0])}')
     for region, region_indices in region_indices_lookup.items():
@@ -439,11 +456,24 @@ def save_seed(chamber: str, directory: str, geographic_unit: str, plan: Optional
         save_graph_compressed_json(county_district_graph, county_district_graph_path_prefix + '.json.gz')
 
 
+def save_plan_seeds(chamber: str, directory: str, min_plan: Optional[int]) -> None:
+    geographic_unit = 'cntyvtd'
+    redistricting_data = load_redistricting_data(directory)
+    redistricting_data.set_index(['geoid'], inplace=True, drop=False)
+    for plan in sorted(pp.get_valid_plans(chamber, pp.build_plans_directory(directory)),
+                       reverse=True):
+        if min_plan is not None and plan < min_plan:
+            continue
+
+        print(plan)
+        save_seed(chamber, directory, geographic_unit, plan, redistricting_data)
+
+
 if __name__ == '__main__':
     def main() -> None:
         directory = 'G:/rob/projects/election/rob/'
 
-        chamber = 'TXHD'
+        chamber = 'DCN'
         plan = 2176
         settings = cm.build_proposed_plan_simulation_settings(chamber, plan)
 
@@ -483,7 +513,8 @@ if __name__ == '__main__':
 
         if False:
             with Timer(name='load_plans'):
-                plans = cm.load_plans(directory, product_ensemble_description, 0)
+                district_offset = 0
+                plans = cm.load_plans(directory, product_ensemble_description, 0, district_offset=district_offset)
 
             defects = calculate_plans_defects(dual_graph, county_district_graph, plans)
             # print(defects)
@@ -491,20 +522,8 @@ if __name__ == '__main__':
             np.savez_compressed(f'{product_ensemble_directory}defects.npz', np.array(defects))
 
         if True:
-            geographic_unit = 'cntyvtd'
-
-            redistricting_data = load_redistricting_data(directory)
-            redistricting_data.set_index(['geoid'], inplace=True, drop=False)
-
-            for chamber in ['DCN']:  # cm.CHAMBERS:
-                print(chamber)
-                for plan in sorted(pp.get_valid_plans(chamber, pp.build_plans_directory(directory)),
-                                   reverse=True):
-                    # if plan < 93173:
-                    #    return
-
-                    print(plan)
-                    save_seed(chamber, directory, geographic_unit, plan, redistricting_data)
+            for chamber in ['DCN']:
+                save_plan_seeds(chamber, directory)
 
 
     main()

@@ -14,8 +14,10 @@ import common as cm
 import data_transform as dt
 import GerryWrap as gw
 import partitions_analysis as pa
+import plan_statistics as ps
 import plotting as pl
 import proposed_plans as pp
+import reporting
 import simulation as si
 import simulation_analysis as sa
 
@@ -99,10 +101,8 @@ def save_raw_plan(chamber: str, output_path: str, assignment: dict[str, int]) ->
     current_plan_df.to_csv(output_path, index=False)
 
 
-def save_current_proposed_plans_plot(directory: str, chamber: str, election: str) -> None:
-    ensemble_directory = cm.build_ensemble_directory(directory, cm.build_settings(chamber).ensemble_description)
-    statistic_name = dt.build_election_filename_prefix(election)
-    ensemble_matrix = cm.load_ensemble_matrix_sorted(ensemble_directory, statistic_name)
+def save_current_proposed_plans_plot(chamber: str, directory: str, election: str) -> None:
+    statistic_name = dt.build_election_filename_prefix(election, 'votes')
 
     current_plan = cm.determine_original_plan(chamber)
     comparison_plans = sorted(pp.get_valid_plans(chamber, pp.build_plans_directory(directory)) - {2100},
@@ -110,60 +110,59 @@ def save_current_proposed_plans_plot(directory: str, chamber: str, election: str
     plans = ([] if current_plan is None else [current_plan]) + comparison_plans
     plan_vectors = cm.load_plan_vectors(chamber, directory, statistic_name, plans)
 
-    chainlength, districts = np.shape(ensemble_matrix)
+    mean_medians_ensemble, partisan_bias_ensemble = ps.load_ensemble_statistics(chamber, directory, statistic_name)
+    chainlength = np.shape(mean_medians_ensemble)[0]
+    districts = cm.get_number_districts(chamber)
+    print(f"{chainlength} {districts}")
     hmid = 1 + (districts - 1) / 2.0
-    mean_medians_ensemble = np.zeros(chainlength)
-    partisan_bias_ensemble = np.zeros(chainlength)
-    for j in range(0, chainlength):
-        if j % 100000 == 0:
-            print(j)
-        mean_median, partisan_bias = gw.calculate_mean_median_partisan_bias(districts, hmid, ensemble_matrix[j])
-        mean_medians_ensemble[j] = mean_median
-        partisan_bias_ensemble[j] = partisan_bias
 
-    groups = defaultdict(list)
-    for mean_median, partisan_bias in zip(mean_medians_ensemble, partisan_bias_ensemble):
-        groups[partisan_bias].append(mean_median)
+    plan_partisan_bias_groups = defaultdict(list)
+    for plan_mean_median, plan_partisan_bias in zip(mean_medians_ensemble, partisan_bias_ensemble):
+        plan_partisan_bias_groups[plan_partisan_bias].append(plan_mean_median / 100)
 
-    partisan_biases = sorted(groups)
-    partisan_bias_probs = defaultdict(float)
-    for key in partisan_biases:
-        l = groups[key]
-        partisan_bias_probs[key] = len(l) / len(mean_medians_ensemble)
-        print(f'{key} {partisan_bias_probs[key]} {np.median(l)} {np.average(l)}')
+    ensemble_partisan_biases = sorted(plan_partisan_bias_groups)
+    ensemble_partisan_bias_probs = defaultdict(float)
+    for plan_partisan_bias in ensemble_partisan_biases:
+        partisan_bias_group = plan_partisan_bias_groups[plan_partisan_bias]
+        ensemble_partisan_bias_probs[plan_partisan_bias] = len(partisan_bias_group) / chainlength
+        print(f'{plan_partisan_bias} {ensemble_partisan_bias_probs[plan_partisan_bias]} {np.median(partisan_bias_group)} {np.average(partisan_bias_group)}')
 
     plt.rcParams['figure.figsize'] = [15, 15]
-    violin_values = [groups[x] for x in partisan_biases]
+    violin_values = [plan_partisan_bias_groups[x] for x in ensemble_partisan_biases]
     pc_thresh = .01
 
     y_last = defaultdict(float)
-    partisan_bias_groups = defaultdict(list)
+    plan_partisan_bias_groups = defaultdict(list)
     for x, y in plan_vectors.items():
-        mean_median, partisan_bias = gw.calculate_mean_median_partisan_bias(districts, hmid, y)
-        partisan_bias_groups[partisan_bias].append((x, mean_median))
+        plan_mean_median, plan_partisan_bias = gw.calculate_mean_median_partisan_bias(districts, hmid, y)
+        plan_partisan_bias_groups[plan_partisan_bias].append((x, plan_mean_median))
 
-    for partisan_bias in partisan_bias_groups:
-        partisan_bias_groups[partisan_bias] = sorted(partisan_bias_groups[partisan_bias], key=lambda x: x[1])
+    for plan_partisan_bias in plan_partisan_bias_groups:
+        plan_partisan_bias_groups[plan_partisan_bias] = list(sorted(plan_partisan_bias_groups[plan_partisan_bias], key=lambda x: x[1], reverse=True))
 
     plans_metadata = pp.load_plans_metadata(chamber, pp.build_plans_directory(directory))
-    offset = .005
-    for partisan_bias in sorted(partisan_bias_groups, reverse=True):
-        y_last[partisan_bias] = -100
-        for plan_number, mean_median in partisan_bias_groups[partisan_bias]:
+    offset = -.005
+    for plan_partisan_bias in sorted(plan_partisan_bias_groups):
+        y_last[plan_partisan_bias] = 100
+        for plan_number, plan_mean_median in plan_partisan_bias_groups[plan_partisan_bias]:
             plan_metadata = plans_metadata.loc[plan_number]
-            plt.plot(partisan_bias, mean_median, 'rs')
-            if mean_median - y_last[partisan_bias] < offset:
-                y_last[partisan_bias] = y_last[partisan_bias] + offset
+            plt.plot(plan_partisan_bias, plan_mean_median, 'rs')
+            if plan_mean_median - y_last[plan_partisan_bias] > offset:
+                y_last[plan_partisan_bias] = y_last[plan_partisan_bias] + offset
             else:
-                y_last[partisan_bias] = mean_median
-            plt.gca().annotate(
-                f'{plan_number} {plan_metadata.description if plan_metadata.description is not np.nan else ""}',
-                (partisan_bias + .15, y_last[partisan_bias] + .001))
+                y_last[plan_partisan_bias] = plan_mean_median
+            x_coordinate = plan_partisan_bias + .15
+            y_coordinate = y_last[plan_partisan_bias] - .001
+            print(f"{plan_partisan_bias} {plan_mean_median} {plan_number} {x_coordinate} {y_coordinate}")
+            plt.gca().annotate(f'{plan_number} {plan_metadata.description if plan_metadata.description is not np.nan else ""}',
+                               xy=(plan_partisan_bias, plan_mean_median), xycoords='data',
+                               xytext=(x_coordinate, y_coordinate), textcoords='data',
+                               arrowprops=dict(arrowstyle='-', relpos=(0,0.5)))
 
-    max_prob = max(partisan_bias_probs.values())
-    widths = [.8 * partisan_bias_probs[x] / max_prob for x in partisan_biases]
-    plt.violinplot(violin_values, partisan_biases, showextrema=False, widths=widths,
-                   quantiles=[[pc_thresh, .5, 1 - pc_thresh] for _ in partisan_biases])
+    max_prob = max(ensemble_partisan_bias_probs.values())
+    widths = [.8 * ensemble_partisan_bias_probs[x] / max_prob for x in ensemble_partisan_biases]
+    plt.violinplot(violin_values, ensemble_partisan_biases, showextrema=False, widths=widths,
+                   quantiles=[[pc_thresh, .5, 1 - pc_thresh] for _ in ensemble_partisan_biases])
 
     plt.xlabel("Partisan Bias")
     plt.ylabel("Mean Median")
@@ -185,7 +184,33 @@ if __name__ == '__main__':
             save_current_DCN_plan(directory)
 
         if True:
-            save_current_proposed_plans_plot(directory, chamber, election)
+            save_current_proposed_plans_plot(chamber, directory, election)
+
+        if False:
+            plans_directory = pp.build_plans_directory(directory)
+            plans_metadata = pp.load_plans_metadata(chamber, plans_directory)
+            pp.save_current_merged_plans(chamber, directory, plans_metadata, force=False)
+
+            pp.save_current_plan_vectors(chamber, directory)
+            pp.save_plan_vectors_summary(chamber, directory)
+            pp.save_plan_vectors_differences(chamber, directory, cm.determine_original_plan(chamber))
+
+            min_plan = 101652
+
+            sa.save_plan_seeds(chamber, directory, min_plan)
+
+            pl.save_proposed_plan_diff_maps(chamber, directory, min_plan)
+
+            pl.FAST_PLOTTING = True
+            pl.save_plots(chamber, directory, min_plan)
+
+            reporting.save_reports(chamber, directory, min_plan)
+
+            save_current_proposed_plans_plot(chamber, directory, election)
+
+            ps.save_plan_statistics([chamber], directory)
+
+            # TODO: upload diff_map, report, plans plot
 
 
 main()

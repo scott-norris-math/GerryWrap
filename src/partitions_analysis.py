@@ -310,7 +310,8 @@ def save_matching_files(chamber: str, directory: str) -> None:
     ensemble_directory = cm.build_ensemble_directory(directory, settings.ensemble_description)
 
     # plans = cm.load_plans_from_path(f'{ensemble_directory}unique_plans.npz')
-    plans = cm.load_plans_from_files(directory, settings.ensemble_description, range(0, settings.number_files))
+    plans = cm.load_plans_from_files(directory, settings.ensemble_description, range(0, settings.number_files),
+                                     settings.district_offset)
 
     if chamber == 'USCD':
         plans = plans + 1

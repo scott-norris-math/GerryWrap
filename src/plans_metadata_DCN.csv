@@ -5,7 +5,7 @@ plan,description,submitter,previous_plan,changed_rows,invalid
 76160,Compact,,0,0,0
 76310,The Best Plan,,0,0,0
 76786,Edited CD,,0,0,0
-76803,DKC14,,0,0,0
+76803,DKC14,,0,0,1
 77003,Young plan,,0,0,0
 77177,The Best Plan v1.1,,0,0,0
 77188,TJWPlan,,0,0,0
@@ -13,7 +13,7 @@ plan,description,submitter,previous_plan,changed_rows,invalid
 77281,Pak152,,0,0,1
 77286,Dallas,,0,0,0
 77364,,,0,0,0
-77449,77449,,0,0,1
+77449,,,0,0,1
 77510,Luther Harris Submission,,0,0,0
 77653,Pedrol,,0,0,0
 77980,Perfectly balanced as all things should be,,0,0,0
@@ -34,3 +34,11 @@ plan,description,submitter,previous_plan,changed_rows,invalid
 92048,Southern Neighborhoods Fair II,,0,0,0
 92393,Bolden Design,,0,0,1
 93173,Betzen Draft 1,,0,0,0
+95766,,,0,0,0
+99549,Betzen 14 Population Center Map Draft 5,,0,0,0
+100113,,,0,0,0
+100532,Betzen Submission #1,,0,0,0
+100997,Betzen Submission #2,,0,0,0
+101516,Betzen Submission #3,,0,0,0
+101606,TACW 101464,,0,0,0
+101652,,,0,0,0

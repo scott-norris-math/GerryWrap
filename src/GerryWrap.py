@@ -366,8 +366,7 @@ def seats_votes_varying_maps_2(ensemble_transposed: np.ndarray, title: str, pc_t
     return myplot
 
 
-def seats_votes_ensemble(ensemble_transposed: np.ndarray, title: str, statewide: Any = None,
-                         have_actual: bool = True) -> Any:
+def seats_votes_ensemble(ensemble_transposed: np.ndarray, title: str, statewide: Any = None, have_actual: bool = True) -> Any:
     # INPUTS
     #     ensemble:  (nDistrict x nPlan) array of values. MUST BE SORTED WITHIN EACH COLUMN
     #     title: string for title
@@ -376,24 +375,25 @@ def seats_votes_ensemble(ensemble_transposed: np.ndarray, title: str, statewide:
     #    have_actual/Does ensemble include data assoc. with an exacted plan? 
     #             If so, assume FIRST COLUMN is enacted/[True]
 
-    # get shape of data
+    #     plot them together in the same figure
+    # -------------------------------------------------
+
+    myfigure = plt.figure(figsize=(6.5, 5))
+
+    plt.subplot(211)
+    plot_seats_votes_ensemble(ensemble_transposed, title, statewide)
+
+    if have_actual:
+        # panel 2
+        # -------------------
+        plt.subplot(212)
+        plot_seats_votes_actual(ensemble_transposed, title, statewide, have_actual)
+
+    return myfigure
+
+
+def plot_seats_votes_ensemble(ensemble_transposed: np.ndarray, title: str, statewide: Any = None) -> None:
     districts, chainlength = np.shape(ensemble_transposed)
-
-    if have_actual:
-        # get the actual outcomes
-        actuals = np.array(sorted(ensemble_transposed[:, 0], reverse=True))
-        actual_seats = np.sum(actuals > .5)
-        actual_votes = np.mean(actuals) if statewide is None else statewide
-    else:
-        # If None, we just don't plot
-        actual_votes = statewide
-
-    if have_actual:
-        # seats / votes curve, assuming uniform swing
-        seatsvotes1 = actual_votes - actuals + 0.5
-
-        # apply reflection about (.5, .5)
-        seatsvotes2 = np.flip(1 - seatsvotes1)
 
     # now compute an average seats/votes over many samples
     # ------------------------------------------------
@@ -419,18 +419,11 @@ def seats_votes_ensemble(ensemble_transposed: np.ndarray, title: str, statewide:
     avg_seatsvotes1 = np.array(avg_seatsvotes)
     avg_seatsvotes2 = np.flip(1 - avg_seatsvotes1)
 
-    #     plot them together in the same figure
-    # -------------------------------------------------
-
-    seats = range(1, districts + 1)
-
-    myfigure = plt.figure(figsize=(6.5, 5))
-
-    plt.subplot(211)
     plt.title(title)
 
     # panel 1: the ensemble
     # -------------------
+    seats = range(1, districts + 1)
     plt.plot(seats, avg_seatsvotes1, 'b', lw=2, label="Democrats")
     plt.plot(seats, avg_seatsvotes2, 'r', lw=2, label="Republicans")
     plt.fill_between(seats, avg_seatsvotes1, avg_seatsvotes2, where=(avg_seatsvotes1 > avg_seatsvotes2),
@@ -455,7 +448,7 @@ def seats_votes_ensemble(ensemble_transposed: np.ndarray, title: str, statewide:
     plt.plot([hmid, hmid], [vmin - vbuff, vmax + vbuff], '--', lw=2, color="gray", label="Majority Seat")
 
     # Should "actual" result be the location on the curve at the actual statewide percentage?
-    # vs. the 
+    # vs. the
     plt.plot([avg_seats + 0.5], [avg_votes], 'bs', lw=2, label="Actual Dem. Result")
     plt.plot([districts - avg_seats + 0.5], [1 - avg_votes], 'rs', label="Actual Rep. Result")
 
@@ -469,52 +462,122 @@ def seats_votes_ensemble(ensemble_transposed: np.ndarray, title: str, statewide:
     plt.ylabel("Statewide Vote Share")
     plt.legend(**{'fontsize': 8})
 
+
+def plot_seats_votes_actual(ensemble_transposed: np.ndarray, title: str, statewide: Any = None, have_actual: bool = True) -> None:
+    districts, chainlength = np.shape(ensemble_transposed)
+
     if have_actual:
-        # panel 2
-        # -------------------
-        plt.subplot(212)
+        # get the actual outcomes
+        actuals = np.array(sorted(ensemble_transposed[:, 0], reverse=True))
+        actual_seats = np.sum(actuals > .5)
+        actual_votes = np.mean(actuals) if statewide is None else statewide
 
-        plt.title(title)
+        # seats / votes curve, assuming uniform swing
+        seatsvotes1 = actual_votes - actuals + 0.5
 
-        plt.plot(seats, seatsvotes1, 'b', lw=2, label="Democrats")
-        plt.plot(seats, seatsvotes2, 'r', lw=2, label="Republicans")
-        plt.fill_between(seats, seatsvotes1, seatsvotes2, where=(seatsvotes1 > seatsvotes2), interpolate=True,
-                         **{'alpha': .2})
+        # apply reflection about (.5, .5)
+        seatsvotes2 = np.flip(1 - seatsvotes1)
+    else:
+        # If None, we just don't plot
+        actual_votes = statewide
 
-        # labeling
-        dpos = [ii for ii in range(districts) if seatsvotes1[ii] > 0.5]
-        first = dpos[0]
-        start = seatsvotes1[first - 1]
-        final = seatsvotes1[first]
-        slope = final - start
+    plt.title(title)
 
-        hmin = 1 + (first - 1) + (0.5 - start) / slope
-        hmid = 1 + (districts - 1) / 2.0
-        hmax = hmin + 2 * (hmid - hmin)
+    seats = range(1, districts + 1)
+    plt.plot(seats, seatsvotes1, 'b', lw=2, label="Democrats")
+    plt.plot(seats, seatsvotes2, 'r', lw=2, label="Republicans")
+    plt.fill_between(seats, seatsvotes1, seatsvotes2, where=(seatsvotes1 > seatsvotes2), interpolate=True,
+                     **{'alpha': .2})
 
-        vmax = seatsvotes1[round(hmid) - 1] if districts % 2 != 0 else 0.5 * (
+    # labeling
+    dpos = [x for x in range(districts) if seatsvotes1[x] > 0.5]
+    first = dpos[0]
+    start = seatsvotes1[first - 1]
+    final = seatsvotes1[first]
+    slope = final - start
+
+    hmin = 1 + (first - 1) + (0.5 - start) / slope
+    hmid = 1 + (districts - 1) / 2.0
+    hmax = hmin + 2 * (hmid - hmin)
+
+    vmax = seatsvotes1[round(hmid) - 1] if districts % 2 != 0 else 0.5 * (
             seatsvotes1[round(hmid - 0.5) - 1] + seatsvotes1[round(hmid + 0.5) - 1])
-        vmid = 0.5
-        vmin = vmax - 2 * (vmax - vmid)
+    vmid = 0.5
+    vmin = vmax - 2 * (vmax - vmid)
 
-        plt.plot([hmin - hbuff, hmax + hbuff], [vmid, vmid], '--', lw=2, color="green", label="Equal Voteshares")
-        plt.plot([hmid, hmid], [vmin - vbuff, vmax + vbuff], '--', lw=2, color="gray", label="Majority Seat")
-        plt.plot([actual_seats + 0.5], [actual_votes], 'bs', lw=2, label="Actual Dem. Result")
-        plt.plot([districts - actual_seats + 0.5], [1 - actual_votes], 'rs', label="Actual Rep. Result")
+    hbuff = 0.25
+    vbuff = 0.01
+    plt.plot([hmin - hbuff, hmax + hbuff], [vmid, vmid], '--', lw=2, color="green", label="Equal Voteshares")
+    plt.plot([hmid, hmid], [vmin - vbuff, vmax + vbuff], '--', lw=2, color="gray", label="Majority Seat")
+    plt.plot([actual_seats + 0.5], [actual_votes], 'bs', lw=2, label="Actual Dem. Result")
+    plt.plot([districts - actual_seats + 0.5], [1 - actual_votes], 'rs', label="Actual Rep. Result")
 
-        print("Vote Needed for Majority (D-R) -- Actual:     %4.4f" % (vmax - vmin))
-        print("Seats at 50%% Voteshare   (D-R) -- Actual:       %4d" % (hmax - hmin))
+    print("Vote Needed for Majority (D-R) -- Actual:     %4.4f" % (vmax - vmin))
+    print("Seats at 50%% Voteshare   (D-R) -- Actual:       %4d" % (hmax - hmin))
 
-        # cleaning up
-        plt.xlim(0, districts + 1)
-        plt.ylim(0.25, 0.75)
-        plt.ylabel("Percent Vote Share")
-        plt.xlabel("Number of Seats")
-        plt.text(hmid, .7, "Enacted Plan", **{'va': 'top', 'ha': 'center', 'size': 10, 'weight': 'bold'})
-        plt.legend(**{'fontsize': 8})
-        plt.tight_layout()
+    # cleaning up
+    plt.xlim(0, districts + 1)
+    plt.ylim(0.25, 0.75)
+    plt.ylabel("Percent Vote Share")
+    plt.xlabel("Number of Seats")
+    plt.text(hmid, .7, "Enacted Plan", **{'va': 'top', 'ha': 'center', 'size': 10, 'weight': 'bold'})
+    plt.legend(**{'fontsize': 8})
+    plt.tight_layout()
 
-    return myfigure
+
+def plot_seats_votes_actual_inverted(ensemble_transposed: np.ndarray, title: str) -> None:
+    districts, chainlength = np.shape(ensemble_transposed)
+
+    # get the actual outcomes
+    actuals = np.array(sorted(ensemble_transposed[:, 0], reverse=True))
+    actual_seats = np.sum(actuals > .5)
+    actual_votes = np.mean(actuals)
+
+    # seats / votes curve, assuming uniform swing
+    seatsvotes1 = actual_votes - actuals + 0.5
+
+    # apply reflection about (.5, .5)
+    seatsvotes2 = np.flip(1 - seatsvotes1)
+
+    plt.title(title)
+
+    seats = range(1, districts + 1)
+    plt.plot(seatsvotes1, seats, 'b', lw=2, label="Democrats")
+    plt.plot(seatsvotes2, seats, 'r', lw=2, label="Republicans")
+    #plt.fill_between(seats, seatsvotes1, seatsvotes2, where=(seatsvotes1 > seatsvotes2), interpolate=True,
+    #                 **{'alpha': .2})
+
+    # labeling
+    dpos = [x for x in range(districts) if seatsvotes1[x] > 0.5]
+    first = dpos[0]
+    start = seatsvotes1[first - 1]
+    final = seatsvotes1[first]
+    slope = final - start
+
+    hmin = 1 + (first - 1) + (0.5 - start) / slope
+    hmid = 1 + (districts - 1) / 2.0
+    hmax = hmin + 2 * (hmid - hmin)
+
+    vmax = seatsvotes1[round(hmid) - 1] if districts % 2 != 0 else 0.5 * (
+            seatsvotes1[round(hmid - 0.5) - 1] + seatsvotes1[round(hmid + 0.5) - 1])
+    vmid = 0.5
+    vmin = vmax - 2 * (vmax - vmid)
+
+    hbuff = 0.25
+    vbuff = 0.01
+    plt.plot([vmid, vmid], [hmin - hbuff, hmax + hbuff], '--', lw=2, color="green", label="Equal Voteshares")
+    plt.plot([vmin - vbuff, vmax + vbuff], [hmid, hmid], '--', lw=2, color="gray", label="Majority Seat")
+    plt.plot([actual_votes], [actual_seats + 0.5], 'bs', lw=2, label="Actual Dem. Result")
+    plt.plot([1 - actual_votes], [districts - actual_seats + 0.5], 'rs', label="Actual Rep. Result")
+
+    # cleaning up
+    plt.xlim(0, 1)
+    plt.ylim(1, districts + 1)
+    plt.xlabel("Percent Vote Share")
+    plt.ylabel("Number of Seats")
+    plt.text(hmid, .7, "Enacted Plan", **{'va': 'top', 'ha': 'center', 'size': 10, 'weight': 'bold'})
+    plt.legend(**{'fontsize': 8})
+    plt.tight_layout()
 
 
 def mean_median_distribution(ensemble: np.ndarray, instance: np.ndarray,
@@ -578,6 +641,23 @@ def mean_median_partisan_bias(ensemble_transposed: np.ndarray, have_actual: bool
         number_seats[0, j] = np.sum(seatsvotes1 <= 0.5)
         number_seats[1, j] = np.sum(seatsvotes2 <= 0.5)
 
+    # Mean Median
+    myfigure = plt.figure(figsize=(6.5, 3.5))
+    axes = plt.subplot(121)
+
+    plot_mean_median_hist(axes, have_actual, comparison_label, majority_vs)
+
+    # Partisan Bias
+    plt.subplot(122)
+
+    plot_partisan_bias_hist(have_actual, comparison_label, number_seats)
+
+    plt.tight_layout()
+
+    return myfigure
+
+
+def plot_mean_median_hist(axes, have_actual: bool, comparison_label: str, majority_vs: np.ndarray) -> None:
     # things we need to plot
     mean_medians_ensemble = majority_vs[1, :] - majority_vs[0, :]
     mvdiff = np.median(mean_medians_ensemble)
@@ -590,46 +670,17 @@ def mean_median_partisan_bias(ensemble_transposed: np.ndarray, have_actual: bool
     vbinedge_max = np.ceil(vdmax)
     vbinbounds = np.arange(vbinedge_min, vbinedge_max + .01, .01)
     vdbuff = (vdmax - vdmin) * .025
-
     vhist, vedges = np.histogram(mean_medians_ensemble, bins=vbinbounds)
-    if have_actual:
-        print("MM Enacted Plan Percentile = ", stats.percentileofscore(mean_medians_ensemble, cvdiff))
-        print(majority_vs[:, 0])
-        print(mvdiff)
-
-    # things we need to plot
-    partisan_biases_ensemble = number_seats[0, :] - number_seats[1, :]
-    mndiff = np.median(partisan_biases_ensemble)
-    cndiff = partisan_biases_ensemble[0]
-
-    # for making it look nice
-    ndmin = min(partisan_biases_ensemble)
-    ndmax = max(partisan_biases_ensemble)
-    nbinedge_min = np.floor(ndmin)
-    nbinedge_max = np.ceil(ndmax)
-    nbinbounds = np.arange(nbinedge_min - 0.5, nbinedge_max + 0.5)
-    ndbuff = (ndmax - ndmin) * .01
-
-    nhist, nedges = np.histogram(partisan_biases_ensemble, bins=nbinbounds)
-    if have_actual:
-        print("PB Enacted Plan Percentile = ", stats.percentileofscore(partisan_biases_ensemble, cndiff))
-        print(number_seats[:, 0])
-        print(mndiff)
-        print(np.count_nonzero(partisan_biases_ensemble == cndiff))
-        print(np.count_nonzero(partisan_biases_ensemble < cndiff))
-        print(min(partisan_biases_ensemble))
-
-    # Mean Median
-    myfigure = plt.figure(figsize=(6.5, 3.5))
-    axes = plt.subplot(121)
 
     plt.hist(mean_medians_ensemble, bins=vbinbounds, color="xkcd:dark blue", **{'alpha': 0.3})
+
     plt.axvline(x=mvdiff, color="green", ls='--', lw=2.5, ymax=0.75, label="Ensemble Median")
+
     if have_actual:
         plt.axvline(x=cvdiff, color="purple", ls='--', lw=2.5, ymax=0.75, label=comparison_label)
+
     plt.xlim(vdmin - vdbuff, vdmax + vdbuff)
     axes.xaxis.set_major_formatter(lambda x, pos: format(100 * x, ".0f"))
-
     plt.ylim(0, np.max(vhist) * 1.4)
     plt.tick_params(
         axis='y',  # changes apply to the y-axis
@@ -642,9 +693,24 @@ def mean_median_partisan_bias(ensemble_transposed: np.ndarray, have_actual: bool
     plt.title('"Mean-Median" Score')
     plt.legend(loc="upper center")
 
-    # Partisan Bias
-    plt.subplot(122)
+
+def plot_partisan_bias_hist(have_actual: bool, comparison_label: str, number_seats: np.ndarray) -> None:
+    # things we need to plot
+    partisan_biases_ensemble = number_seats[0, :] - number_seats[1, :]
+    mndiff = np.median(partisan_biases_ensemble)
+    cndiff = partisan_biases_ensemble[0]
+
+    # for making it look nice
+    ndmin = min(partisan_biases_ensemble)
+    ndmax = max(partisan_biases_ensemble)
+    nbinedge_min = np.floor(ndmin)
+    nbinedge_max = np.ceil(ndmax)
+    nbinbounds = np.arange(nbinedge_min - 0.5, nbinedge_max + 0.5)
+    ndbuff = (ndmax - ndmin) * .01
+    nhist, nedges = np.histogram(partisan_biases_ensemble, bins=nbinbounds)
+
     plt.hist(partisan_biases_ensemble, bins=nbinbounds, color="xkcd:dark blue", **{'alpha': 0.3})
+
     plt.axvline(x=mndiff, color="green", ls='--', lw=2.5, ymax=0.75, label="Ensemble Median")
     if have_actual:
         plt.axvline(x=cndiff, color="purple", ls='--', lw=2.5, ymax=0.75, label=comparison_label)
@@ -665,9 +731,6 @@ def mean_median_partisan_bias(ensemble_transposed: np.ndarray, have_actual: bool
     plt.title('"Partisan Bias" Score')
     plt.xlabel("Seat Difference at Equal Votes (D-R)")
     plt.legend(loc="upper center")
-
-    plt.tight_layout()
-    return myfigure
 
 
 def partisan_metrics_histpair(ensemble: np.ndarray, instance: np.ndarray) -> Any:
@@ -856,8 +919,8 @@ def partisan_metrics_hist2D(ensemble_matrix: np.ndarray, plan_vector: np.ndarray
     return myfigure, previous_point
 
 
-def partisan_metrics_hist2D_all(ensemble_matrix: np.ndarray, plan_vectors: dict[int, np.ndarray],
-                                height_restarts: set[int]) -> Any:
+def partisan_metrics_hist2D_all_plans(ensemble_matrix: np.ndarray, plan_vectors: dict[int, np.ndarray],
+                                      height_restarts: set[int]) -> Any:
     chainlength, districts = np.shape(ensemble_matrix)
     hmid = 1 + (districts - 1) / 2.0
 

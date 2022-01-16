@@ -70,7 +70,8 @@ def load_geodataframe(directory: str, redistricting_data_filename: str = None) -
 
         geodata = pd.concat([county_vtd_geodata, county_geodata]).drop_duplicates().set_index('geoid', drop=False)
     else:
-        node_data = pd.read_parquet(f'{redistricting_data_directory}{redistricting_data_filename}')
+        path = f'{redistricting_data_directory}{redistricting_data_filename}'
+        node_data = pd.read_parquet(path) if path.endswith('.parquet') else pd.read_csv(path)
 
         node_data['geometry'] = node_data['polygon'].apply(wkt.loads)
         node_geodata = gpd.GeoDataFrame(node_data, geometry='geometry')
@@ -90,7 +91,7 @@ def fix_election_columns_text(df: pd.DataFrame) -> None:
 
 
 def load_graph_with_data(directory: str, dual_graph_filename: str, geodata: gpd.GeoDataFrame,
-                             columns: Optional[list[str]] = ['geometry']) -> Graph:
+                         columns: Optional[list[str]] = ['geometry']) -> Graph:
     seeds_directory = cm.build_seeds_directory(directory)
     dual_graph = nx.read_gpickle(f'{seeds_directory}{dual_graph_filename}')
     graph = Graph(dual_graph, geometry=geodata)
@@ -98,7 +99,7 @@ def load_graph_with_data(directory: str, dual_graph_filename: str, geodata: gpd.
     return graph
 
 
-def load_plan_seed_with_data(chamber:str, directory: str, plan: int, columns: list[str]) -> Graph:
+def load_plan_seed_with_data(chamber: str, directory: str, plan: int, columns: list[str]) -> Graph:
     settings = cm.build_proposed_plan_simulation_settings(chamber, plan)
     geodata = load_geodataframe(directory, settings.redistricting_data_filename)
     return load_graph_with_data(directory, settings.dual_graph_filename, geodata, columns)
@@ -116,7 +117,7 @@ def load_graph_with_geometry(directory: str, dual_graph_filename: str, geodata: 
     return graph
 
 
-def load_geographic_partition(chamber:str, directory: str, plan: int,
+def load_geographic_partition(chamber: str, directory: str, plan: int,
                               columns: Optional[list[str]] = ['geometry']) -> GeographicPartition:
     settings = cm.build_proposed_plan_simulation_settings(chamber, plan)
     geodata = load_geodataframe(directory, settings.redistricting_data_filename)
@@ -702,12 +703,12 @@ if __name__ == '__main__':
             copy2(f'{seeds_directory}{settings.dual_graph_filename}', ensemble_directory)
             if chamber in cm.CHAMBERS:
                 copy2(f'{seeds_directory}{settings.country_district_graph_filename}', ensemble_directory)
-            copy2(f'{pp.build_redistricting_data_directory(directory)}{settings.redistricting_data_filename}', ensemble_directory)
+            copy2(f'{pp.build_redistricting_data_directory(directory)}{settings.redistricting_data_filename}',
+                  ensemble_directory)
 
             run_chain(chain, elections, ensemble_directory)
 
 
     main()
-
 
 # TODO Copy in random seed generation code

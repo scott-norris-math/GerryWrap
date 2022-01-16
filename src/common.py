@@ -23,16 +23,20 @@ def load_plans_from_path(path: str) -> np.ndarray:
     return np.load(path)['arr_0']
 
 
-def load_plans(directory: str, ensemble_description: str, file_number: int) -> np.ndarray:
-    return load_plans_from_path(f'{directory}ensembles/ensemble_{ensemble_description}/plans_{file_number}.npz')
+def load_plans(directory: str, ensemble_description: str, file_number: int, district_offset: int) -> np.ndarray:
+    return district_offset + \
+           load_plans_from_path(f'{directory}ensembles/ensemble_{ensemble_description}/plans_{file_number}.npz')
 
 
-def load_plans_from_file(directory: str, ensemble_description: str, plans_filename: str) -> np.ndarray:
-    return load_plans_from_path(f'{directory}ensembles/ensemble_{ensemble_description}/{plans_filename}')
+def load_plans_from_file(directory: str, ensemble_description: str, plans_filename: str,
+                         district_offset: int) -> np.ndarray:
+    return district_offset + \
+           load_plans_from_path(f'{directory}ensembles/ensemble_{ensemble_description}/{plans_filename}')
 
 
-def load_plans_from_files(directory: str, ensemble_description: str, file_numbers: Iterable[int]) -> np.ndarray:
-    return np.concatenate([load_plans(directory, ensemble_description, x) for x in file_numbers])
+def load_plans_from_files(directory: str, ensemble_description: str, file_numbers: Iterable[int],
+                          district_offset: int) -> np.ndarray:
+    return np.concatenate([load_plans(directory, ensemble_description, x, district_offset) for x in file_numbers])
 
 
 def build_assignment(graph: gerrychain.Graph, plan: np.ndarray) -> dict[str, int]:
@@ -50,7 +54,7 @@ def read_all_text(path: str) -> str:
     return page_text
 
 
-def save_all_bytes(data, path: str) -> None:
+def save_all_bytes(data: bytes, path: str) -> None:
     with open(path, 'wb') as fp:
         fp.write(data)
 
@@ -259,7 +263,7 @@ def load_pickle(path: str) -> Any:
 
 def determine_original_plan(chamber: str) -> Optional[int]:
     return {
-        'USCD': None,
+        'USCD': 2100,
         'TXHD': 2100,
         'TXSN': 2100,
         'DCN': 2100,
@@ -297,23 +301,24 @@ def get_current_ensemble(chamber: str) -> tuple[str, int]:
 def build_settings(chamber: str) -> Dict:
     if chamber == 'TXHD':
         plan = 2176
-        settings = build_proposed_plan_simulation_settings(chamber, plan)
-        settings.number_files = 0
+        settings = build_TXHD_random_seed_simulation_settings(plan)
+        settings.cvap_data_filename = dt.build_cvap_data_filename_prefix(chamber, plan) + '.parquet'
+        settings.number_files = 1
         settings.ensemble_description = f'{chamber}_{plan}_product_1'
     elif chamber == 'TXSN':
         settings = build_TXSN_random_seed_simulation_settings()
-        settings.cvap_data_filename = f'{dt.build_cvap_county_countyvtd_data_filename_prefix()}.parquet'
+        settings.cvap_data_filename = f'{dt.build_cvap_county_countyvtd_data_filename_prefix(chamber)}.parquet'
         settings.number_files = 7
         settings.ensemble_description = 'TXSN_random_seed_2'
     elif chamber == 'USCD':
         settings = build_USCD_random_seed_simulation_settings()
-        settings.cvap_data_filename = f'{dt.build_cvap_county_countyvtd_data_filename_prefix()}.parquet'
+        settings.cvap_data_filename = f'{dt.build_cvap_county_countyvtd_data_filename_prefix(chamber)}.parquet'
         settings.number_files = 15
         settings.ensemble_description = 'USCD_random_seed_2'
     elif chamber == 'DCN':
         plan = 93173  # 83605  #
         settings = build_proposed_plan_simulation_settings(chamber, plan)
-        settings.cvap_data_filename = dt.build_cvap_data_filename_prefix('DCN', plan) + '.parquet'
+        settings.cvap_data_filename = dt.build_cvap_data_filename_prefix(chamber, plan) + '.parquet'
         settings.number_files = 96  # 150  # 100
         settings.ensemble_description = f'{chamber}_{plan}_1'  # '2
 
@@ -326,13 +331,27 @@ def build_proposed_plan_simulation_settings(chamber: str, plan: int) -> Dict:
     settings.redistricting_data_filename = f'nodes_TX_2020_cntyvtd_{chamber}_{plan}.parquet'
     settings.country_district_graph_filename = f'adj_TX_2020_cntyvtd_{chamber}_{plan}.gpickle'
     settings.epsilon = determine_population_limit(chamber)
+    settings.district_offset = 0
+    return settings
+
+
+def build_TXHD_random_seed_simulation_settings(plan) -> Dict:
+    settings = Dict()
+    chamber = 'TXHD'
+    settings.dual_graph_filename = 'graph_TX_2020_cntyvtd_TXHD_2176_Reduced.gpickle'
+    settings.redistricting_data_filename = f'nodes_TX_2020_cntyvtd_{chamber}_{plan}.parquet'
+    settings.country_district_graph_filename = f'adj_TX_2020_cntyvtd_{chamber}_{plan}.gpickle'
+    settings.epsilon = determine_population_limit(chamber)
+    settings.district_offset = 0
     return settings
 
 
 def build_TXSN_random_seed_simulation_settings() -> Dict:
     settings = Dict()
     settings.dual_graph_filename = 'graph_TX_2020_cntyvtd_TXSN_seed_1000000.gpickle'
+    settings.redistricting_data_filename = f'nodes_TX_2020_cnty_cntyvtd_sldu.parquet'
     settings.epsilon = determine_population_limit('TXSN')
+    settings.district_offset = 1
     return settings
 
 
@@ -341,6 +360,7 @@ def build_USCD_random_seed_simulation_settings() -> Dict:
     settings.dual_graph_filename = 'graph_TX_2020_cntyvtd_USCD_seed_0207.gpickle'
     settings.redistricting_data_filename = f'nodes_TX_2020_cntyvtd_cd.csv'
     settings.epsilon = determine_population_limit('USCD')
+    settings.district_offset = 1
     return settings
 
 

@@ -1,5 +1,7 @@
-from typing import Iterable
+from collections import defaultdict
+import geopandas as gpd
 import glob
+import itertools
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
@@ -8,7 +10,7 @@ import os
 import pandas as pd
 import pylab
 from shutil import copy2
-from typing import Callable, Optional
+from typing import Callable, Iterable, Optional
 
 import common as cm
 import data_transform as dt
@@ -33,7 +35,8 @@ def build_census_columns_path(chamber: str, directory: str) -> str:
 
 def determine_data_tablock_columns(df: pd.DataFrame) -> list[str]:
     race_columns = ['hisp_pop', 'nonhisp_pop', 'nonhisp_white'] + \
-                   [col for col in df.columns if (col.startswith(dt.O17) or col.startswith(dt.TOTAL) or col.startswith('nonhisp'))]
+                   [col for col in df.columns if
+                    (col.startswith(dt.O17) or col.startswith(dt.TOTAL) or col.startswith('nonhisp'))]
     election_columns = [
         'President_2020_D_Biden_general',
         'President_2020_R_Trump_general',
@@ -97,23 +100,37 @@ def load_cvap_data(directory: str) -> pd.DataFrame:
     return calculated_df
 
 
+def load_vra_data(directory: str) -> gpd.GeoDataFrame:
+    cvap_data = gpd.read_file(f'{build_redistricting_data_directory(directory)}/TX_VTDs_from_VRA_Ensembles/TX_VTDs.shp')
+    cvap_data['geoid'] = [f'{str(x).zfill(3)}{y.zfill(6)}' for x, y in zip(cvap_data['CNTY_x'], cvap_data['VTD_x'])]
+    cvap_data.set_index('geoid', inplace=True)
+    return cvap_data
+
+
 def build_calculated_cvap_data(df: pd.DataFrame) -> pd.DataFrame:
-    def build_column(population_group, racial_group):
+    def build_column(population_group: str, racial_group: str) -> str:
         return f'{population_group}_{racial_group}19'
 
-    def sum_columns(population_group, columns):
+    def sum_columns(population_group: str, columns: str) -> str:
         return sum([df[build_column(population_group, x)] for x in columns])
 
     black_columns = ['BLK', 'BLW', 'AIB']
     hisp_columns = ['HSP']
     white_columns = ['WHT']
-    other_columns = ['AIA', 'ASN', 'NHP', 'AIW', 'ASW', '2OM']
-    all_columns = black_columns + hisp_columns + white_columns + other_columns
+    asian_columns = ['ASN']
+    pacific_columns = ['NHP']
+    native_columns = ['AIA']
+    other_columns = ['AIW', 'ASW', '2OM']
+    all_columns = black_columns + hisp_columns + white_columns + asian_columns + pacific_columns + native_columns + other_columns
 
     column_settings = [('calculated_', 'black', black_columns),
                        ('', 'hisp_pop', hisp_columns),
                        ('calculated_', 'black_hisp', black_columns + hisp_columns),
                        ('', 'nonhisp_white', white_columns),
+                       ('', 'nonhisp_asian', asian_columns),
+                       ('', 'nonhisp_pacific', pacific_columns),
+                       ('', 'nonhisp_native', native_columns),
+                       ('', 'nonhisp_other', other_columns),
                        ('', 'pop', all_columns)]
 
     calculated_df = pd.DataFrame(index=df.index)
@@ -247,7 +264,7 @@ def save_plan_data(chamber: str, directory: str, plan: int) -> None:
         raise RuntimeError(error)
 
     joined_path_prefix = build_redistricting_data_calculated_directory(directory) + \
-                         'redistricting_data_nodes_TX_nodes_TX_2020_tabblock_' + chamber + '_filtered_' + str(plan)
+                         f'redistricting_data_nodes_TX_nodes_TX_2020_tabblock_{chamber}_filtered_{plan}'
     joined_path_parquet = joined_path_prefix + '.parquet'
     joined_df.to_parquet(joined_path_parquet)
     joined_df.to_csv(joined_path_prefix + '.csv')
@@ -264,18 +281,17 @@ def save_plan_data(chamber: str, directory: str, plan: int) -> None:
     print(f"{len(plan_df)}")
 
     plan_df.to_parquet(build_plan_data_path(chamber, directory, plan, 'parquet'))
-    plan_df.to_csv(build_plan_data_csv_path(directory, chamber, plan))
+    plan_df.to_csv(build_plan_data_csv_path(chamber, directory, plan))
 
 
-def build_plan_data_csv_path(directory: str, chamber: str, plan: int) -> str:
+def build_plan_data_csv_path(chamber: str, directory: str, plan: int) -> str:
     return build_plan_data_path(chamber, directory, plan, 'csv')
 
 
 def build_plan_data_path(chamber: str, directory: str, plan: int, suffix: str) -> str:
     aggregated_path_prefix = \
         build_redistricting_data_calculated_directory(directory) + \
-        'redistricting_data_nodes_TX_nodes_TX_2020_' + \
-        chamber + '_' + str(plan)
+        f'redistricting_data_nodes_TX_nodes_TX_2020_{chamber}_{plan}'
     return aggregated_path_prefix + '.' + suffix
 
 
@@ -287,23 +303,43 @@ def build_redistricting_data_calculated_directory(directory: str) -> str:
     return directory + 'redistricting_data_calculated/'
 
 
-def pres20_percent_vector(df: pd.DataFrame) -> pd.Series:
+def pres20_total_vector(df: pd.DataFrame) -> pd.Series:
     dem_votes = df['President_2020_D_Biden_general']
     rep_votes = df['President_2020_R_Trump_general']
-    return dem_votes / (dem_votes + rep_votes)
+    return dem_votes + rep_votes
+
+
+def pres20_percent_vector(df: pd.DataFrame) -> pd.Series:
+    dem_votes = df['President_2020_D_Biden_general']
+    return dem_votes / pres20_total_vector(df)
+
+
+def sen20_total_vector(df: pd.DataFrame) -> pd.Series:
+    dem_votes = df['USSen_2020_D_Hegar_general']
+    rep_votes = df['USSen_2020_R_Cornyn_general']
+    return dem_votes + rep_votes
 
 
 def sen20_percent_vector(df: pd.DataFrame) -> pd.Series:
     dem_votes = df['USSen_2020_D_Hegar_general']
-    rep_votes = df['USSen_2020_R_Cornyn_general']
-    return dem_votes / (dem_votes + rep_votes)
+    return dem_votes / sen20_total_vector(df)
 
 
-def build_statistics_vector_settings() -> list[tuple[str, Callable[[pd.DataFrame], pd.Series]]]:
-    return [(dt.build_election_filename_csv('PRES20', 'vector'), pres20_percent_vector),
-            (dt.build_election_filename_csv('SEN20', 'vector'), sen20_percent_vector)] + \
-            build_statistics_vector_group_settings(dt.O17) + build_statistics_vector_group_settings(dt.TOTAL) + \
-            build_statistics_vector_group_settings(dt.CVAP) + build_statistics_vector_group_settings(dt.C)
+def build_statistics_vector_settings(chamber: str) -> list[tuple[str, Callable[[pd.DataFrame], pd.Series]]]:
+    misc_statistics = []  # [('area', dt.area)]
+    election_statistics = [(dt.build_election_filename_csv('PRES20', 'votes', 'vector'), pres20_percent_vector),
+                           (dt.build_election_filename_csv('PRES20', 'total', 'vector'), pres20_total_vector),
+                           (dt.build_election_filename_csv('SEN20', 'votes', 'vector'), sen20_percent_vector),
+                           (dt.build_election_filename_csv('SEN20', 'total', 'vector'), sen20_total_vector)]
+    return misc_statistics + election_statistics + list(
+        itertools.chain(*(build_statistics_vector_group_settings(x) for x in dt.build_population_groups(chamber))))
+
+
+def build_statistics_vector_names(chamber: str) -> list[str]:
+    return [x for x, y in build_statistics_vector_settings(chamber)] + \
+           ([dt.build_vra_effectiveness_filename(model, racial_group, 'csv', 'vector') for model in
+             dt.build_vra_models()
+             for racial_group in dt.build_vra_racial_groups()] if chamber == 'USCD' else [])
 
 
 def build_statistics_vector_group_settings(group) -> list[tuple[str, Callable[[pd.DataFrame], pd.Series]]]:
@@ -312,8 +348,13 @@ def build_statistics_vector_group_settings(group) -> list[tuple[str, Callable[[p
         (dt.build_race_filename_csv('black', group, 'vector'), lambda x: dt.black_sum_percent(x, group)),
         (dt.build_race_filename_csv('black_hisp', group, 'vector'), lambda x: dt.black_hisp_sum_percent(x, group)),
         (dt.build_race_filename_csv('white', group, 'vector'), lambda x: dt.white_percent(x, group)),
+        (dt.build_race_filename_csv('asian', group, 'vector'), lambda x: dt.asian_percent(x, group)),
+        (dt.build_race_filename_csv('native', group, 'vector'), lambda x: dt.native_percent(x, group)),
+        (dt.build_race_filename_csv('pacific', group, 'vector'), lambda x: dt.pacific_percent(x, group)),
+        (dt.build_race_filename_csv('other', group, 'vector'), lambda x: dt.other_percent(x, group)),
         (dt.build_race_filename_csv('non_white', group, 'vector'), lambda x: dt.non_white_percent(x, group)),
         (dt.build_general_filename_csv(f'pop_{group}', 'vector'), lambda x: dt.pop(x, group)),
+        # (dt.build_general_filename_csv(f'pop_density_{group}', 'vector'), lambda x: dt.pop_density(x, group))
     ]
 
 
@@ -342,13 +383,54 @@ def save_plan_vectors(chamber: str, directory: str, plan: int) -> None:
     plan_df = pd.read_parquet(build_plan_data_path(chamber, directory, plan, 'parquet'))
     output_directory = build_plan_vectors_directory(chamber, directory, plan)
     cm.ensure_directory_exists(output_directory)
-    vector_settings = build_statistics_vector_settings()
+    vector_settings = build_statistics_vector_settings(chamber)
 
     for filename, statistic_func in vector_settings:
         path = output_directory + filename
         if not os.path.exists(path):
             print("Saving: " + path)
             save_vector_file(chamber, plan_df, path, statistic_func)
+
+
+def save_vra_plan_vectors(chamber: str, directory: str, graph: nx.Graph, plan: int) -> None:
+    output_directory = build_plan_vectors_directory(chamber, directory, plan)
+    cm.ensure_directory_exists(output_directory)
+
+    bef_df = load_block_equivalency_file(chamber, directory, plan)
+    normalize_block_equivalency_df(chamber, bef_df)
+
+    print(f"Saving: {plan}")
+    # vra code expects the minimum district to be 0
+    block_assignment = {x: y for x, y in zip(bef_df['geoid'], bef_df['DISTRICT'] - 1)}
+
+    county_vtd_lookup = dt.load_county_vtd_lookup(directory)
+    geoid_to_node_ids = dt.match_census_block_ids(graph, list(block_assignment.keys()), county_vtd_lookup)
+    node_ids_multi_assignments = [(geoid_to_node_ids[x], y) for x, y in block_assignment.items()]
+    node_ids_groups = cm.groupby_project(node_ids_multi_assignments, lambda x: x[0], lambda x: x[1])
+
+    node_assignments = dict()
+    for node_id, districts in node_ids_groups:
+        districts_count = cm.count_groups(districts)
+        max_count = max(districts_count.values())
+        district = [x for x, y in districts_count.items() if y == max_count][0]
+        node_assignments[node_id] = district
+
+    plan_array = np.array([node_assignments[x] for x in sorted(node_assignments)])
+    output_directory = build_plan_vectors_directory(chamber, directory, plan)
+    for i, ensemble_matrices in dt.build_ensemble_vra_matrices(directory, graph, np.reshape(plan_array, (1, -1))):
+        for model, model_dict in ensemble_matrices.items():
+            racial_group_vectors = dict()
+            for racial_group, plan_vector in model_dict.items():
+                print(f"Saving: {model} {racial_group}")
+                racial_group_vectors[racial_group] = plan_vector
+                path = dt.build_vra_effectiveness_path(output_directory, model, racial_group, 'csv', 'vector')
+                cm.save_numpy_csv(path, plan_vector)
+
+            for racial_group, racial_groups in dt.build_vra_aggregate_racial_group_definitions().items():
+                print(f"Saving: {model} {racial_group}")
+                plan_vector = np.sum([racial_group_vectors[x] for x in racial_groups], axis=0)
+                path = dt.build_vra_effectiveness_path(output_directory, model, racial_group, 'csv', 'vector')
+                cm.save_numpy_csv(path, plan_vector)
 
 
 def build_plan_vectors_directory(chamber: str, directory: str, plan: int) -> str:
@@ -431,14 +513,57 @@ def save_current_plan_vectors(chamber: str, directory: str) -> None:
             continue
 
         plan = plan_metadata.plan
-        if not os.path.exists(build_plan_data_csv_path(directory, chamber, plan)):
+        if not os.path.exists(build_plan_data_csv_path(chamber, directory, plan)):
             print(f"Processing Plan Data: {plan}")
             save_plan_data(chamber, directory, plan)
 
         save_plan_vectors(chamber, directory, plan)
 
 
-def save_plan_vectors_summaries(chamber: str, directory: str) -> None:
+def save_current_vra_plan_vectors(chamber: str, directory: str) -> None:
+    cm.ensure_directory_exists(directory + 'plan_vectors/')
+    plans_directory = build_plans_directory(directory)
+    plans_metadata = load_plans_metadata(chamber, plans_directory)
+
+    seeds_directory = cm.build_seeds_directory(directory)
+    settings = cm.build_settings(chamber)
+    dual_graph = nx.read_gpickle(seeds_directory + settings.dual_graph_filename)
+
+    for plan_metadata in plans_metadata.itertuples():
+        if plan_metadata.invalid:
+            continue
+
+        plan = plan_metadata.plan
+        save_vra_plan_vectors(chamber, directory, dual_graph, plan)
+
+
+def save_plan_vectors_summary(chamber: str, directory: str) -> None:
+    save_plan_vectors_impl(chamber, directory, lambda statistic, vector, district: vector[district - 1],
+                           f'{directory}plan_vectors/plan_vectors_summary_{chamber}.csv',
+                           f'{directory}plan_vectors/plan_vectors_summary_pivoted_{chamber}.csv')
+
+
+def save_plan_vectors_differences(chamber: str, directory: str, comparison_plan: int) -> None:
+    plan_directory = build_plan_vectors_directory(chamber, directory, comparison_plan)
+    comparison_vectors = dict()
+
+    def comparison_vector(statistic: str) -> np.ndarray:
+        if statistic not in comparison_vectors:
+            comparison_vectors[statistic] = cm.load_numpy_csv(plan_directory + statistic)
+        return comparison_vectors[statistic]
+
+    save_plan_vectors_impl(chamber, directory,
+                           lambda statistic, vector, district: 0 if district >= len(comparison_vector(statistic))
+                           else vector[district - 1] - comparison_vector(statistic)[district - 1],
+                           f'{directory}plan_vectors/plan_vector_differences_{chamber}.csv',
+                           build_plan_vector_differences_path(chamber, directory))
+
+
+def build_plan_vector_differences_path(chamber: str, directory: str) -> str:
+    return f'{directory}plan_vectors/plan_vector_differences_pivoted_{chamber}.csv'
+
+
+def save_plan_vectors_impl(chamber: str, directory: str, process, output_path: str, output_pivoted_path: str) -> None:
     plans_directory = build_plans_directory(directory)
     plans_metadata = load_plans_metadata(chamber, plans_directory)
 
@@ -449,13 +574,11 @@ def save_plan_vectors_summaries(chamber: str, directory: str) -> None:
         if plan_metadata.invalid:
             continue
 
-        vector_settings = build_statistics_vector_settings()
         plan = plan_metadata.plan
-        if chamber == 'USCD' and plan == 2100:
-            continue
+        print(plan)
 
         plan_directory = build_plan_vectors_directory(chamber, directory, plan)
-        for statistic, _ in vector_settings:
+        for statistic in build_statistics_vector_names(chamber):
             vector = cm.load_numpy_csv(plan_directory + statistic)
             row = {'plan': plan, 'description': plan_metadata.description,
                    'submitter': plan_metadata.submitter, 'previous_plan': plan_metadata.previous_plan,
@@ -464,20 +587,23 @@ def save_plan_vectors_summaries(chamber: str, directory: str) -> None:
                            'submitter': plan_metadata.submitter, 'previous_plan': plan_metadata.previous_plan,
                            'statistic': statistic}
             for district in districts_range:
-                row['district'] = district
-                row['value'] = vector[district - 1]
-                row_pivoted[str(district)] = vector[district - 1]
-                df = df.append(row, ignore_index=True)
+                if district <= len(vector):
+                    row['district'] = district
+                    row['value'] = vector[district - 1]
+                    row_pivoted[str(district)] = process(statistic, vector, district)
+                    df = df.append(row, ignore_index=True)
 
             df_pivoted = df_pivoted.append(row_pivoted, ignore_index=True)
+
     df.sort_values(by=['statistic', 'plan', 'district'], inplace=True)
     df_pivoted.sort_values(by=['statistic', 'plan'], inplace=True)
-    df.to_csv(f'{directory}plan_vectors/current_vectors_{chamber}.csv', index=False)
-    df_pivoted.to_csv(f'{directory}plan_vectors/current_vectors_{chamber}_pivoted.csv', index=False)
+    df.to_csv(output_path, index=False)
+    df_pivoted.to_csv(output_pivoted_path, index=False)
 
 
 def load_plans_metadata(chamber: str, plans_directory: str) -> pd.DataFrame:
     plans_metadata = pd.read_csv(build_plan_metadata_path(chamber, plans_directory))
+    plans_metadata.sort_values('plan', inplace=True)
     plans_metadata.set_index('plan', drop=False, inplace=True)
     return plans_metadata
 
@@ -492,11 +618,6 @@ def determine_valid_plans(plans_metadata_df: pd.DataFrame) -> set[int]:
 
 def get_valid_plans(chamber: str, plans_directory: str) -> set[int]:
     return determine_valid_plans(load_plans_metadata(chamber, plans_directory))
-
-
-def update_plan_vectors(chamber: str, directory: str) -> None:
-    save_current_plan_vectors(chamber, directory)
-    save_plan_vectors_summaries(chamber, directory)
 
 
 def build_graph_path(chamber: str, directory: str) -> str:
@@ -613,8 +734,7 @@ def build_party_lookup(directory: str) -> dict[str, dict[str, str]]:
         legislator_lookup = pd.read_csv(f'{directory}{chamber}PartyLookup.csv')
         split_names = [normalize(x.split(' ')) for x in legislator_lookup['Name'] if x != 'Vacant']
         names = [(elements[0], elements[1]) for elements in split_names]
-        names_grouped = cm.groupby_project(names,
-                                           lambda x: x[1], lambda x: x[0])
+        names_grouped = cm.groupby_project(names, lambda x: x[1], lambda x: x[0])
 
         single_name_mapping = {(y[0] + ' ' + x): x.upper() for x, y in names_grouped if len(y) == 1}
         repeated_name_mapping = {(first_name + ' ' + x): (first_name[0] + ' ' + x).upper() for x, y in names_grouped if
@@ -755,38 +875,49 @@ if __name__ == '__main__':
         t = Timer()
         t.start()
 
-        chamber = 'USCD'  #  'TXHD'  #  'DCN'  #
-        root_directory = 'G:/rob/projects/election/rob/'
-        plans_directory = build_plans_directory(root_directory)
+        chamber = 'DCN'  # 'USCD'  # 'TXHD'  #
+        directory = 'G:/rob/projects/election/rob/'
+        plans_directory = build_plans_directory(directory)
 
         if False:
             pd.set_option('display.width', 500)
             pd.set_option('display.max_columns', 500)
             plan = 2176
-            # analyze_bef_assignments(chamber, root_directory, plan)
-            # analyze_proposed_plan_seed_assignments(chamber, root_directory, plan)
-            # analyze_proposed_plan_seed_assignments_v2(chamber, root_directory, plan)
-            verify_graph(chamber, root_directory, plan)
+            # analyze_bef_assignments(chamber, directory, plan)
+            # analyze_proposed_plan_seed_assignments(chamber, directory, plan)
+            # analyze_proposed_plan_seed_assignments_v2(chamber, directory, plan)
+            verify_graph(chamber, directory, plan)
 
         if False:
             plans_metadata = load_plans_metadata(chamber, plans_directory)
-            save_current_merged_plans(chamber, root_directory, plans_metadata, force=False)
+            save_current_merged_plans(chamber, directory, plans_metadata, force=False)
+
+        if False:
+            for chamber in cm.CHAMBERS + ['DCN']:  # ['USCD']:  #
+                print(f"Chamber: {chamber}")
+                # process_tabblock_data(chamber, directory)
+                save_current_plan_vectors(chamber, directory)
+
+        if False:
+            for chamber in ['USCD']:  # ['DCN']:  # cm.CHAMBERS: #
+                print(f"Chamber: {chamber}")
+                save_current_vra_plan_vectors(chamber, directory)
 
         if True:
-            for chamber in ['DCN']:  # cm.CHAMBERS: # ['USCD']:  #
+            for chamber in cm.CHAMBERS + ['DCN']:  # ['USCD']:  #
                 print(f"Chamber: {chamber}")
-                process_tabblock_data(chamber, root_directory)
-                update_plan_vectors(chamber, root_directory)
+                save_plan_vectors_summary(chamber, directory)
+                save_plan_vectors_differences(chamber, directory, cm.determine_original_plan(chamber))
 
         if False:
             for chamber in cm.CHAMBERS:  # ['USCD']:  #
                 proposed_plans_metadata = load_plans_metadata(chamber, plans_directory)
-                save_graph_filtered(chamber, root_directory, proposed_plans_metadata)
+                save_graph_filtered(chamber, directory, proposed_plans_metadata)
 
         if False:
             plans = [x.plan for x in load_plans_metadata(chamber, plans_directory).itertuples()]
             for source_plan in plans:
-                number_changed_rows = compare_block_equivalence_files(chamber, root_directory, source_plan, 2130)
+                number_changed_rows = compare_block_equivalence_files(chamber, directory, source_plan, 2130)
                 print(f"Compared {source_plan} {2130}  Changed Districts: {number_changed_rows:,}")
 
         t.stop()
