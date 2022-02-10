@@ -82,9 +82,13 @@ def load_ensemble_matrix_sorted(directory: str, statistic_name: str, suffix:str 
 
 def load_ensemble_matrix_sorted_from_path(path: str) -> np.ndarray:
     ensemble_matrix = load_numpy_compressed(path)
+    sort_matrix(ensemble_matrix)
+    return ensemble_matrix
+
+
+def sort_matrix(ensemble_matrix: np.ndarray) -> None:
     for row in ensemble_matrix:
         row.sort()
-    return ensemble_matrix
 
 
 def load_numpy_compressed(path: str) -> np.ndarray:
@@ -95,16 +99,15 @@ def build_plan_name(chamber: str, plan: int) -> str:
     return f"{encode_chamber(chamber)}{plan}"
 
 
-def load_plan_vectors(chamber: str, input_directory: str, statistic_name: str, plans: Iterable[int]) -> \
+def load_plan_vectors(chamber: str, directory: str, statistic_name: str, plans: Iterable[int]) -> \
         dict[int, np.ndarray]:
-    plan_vectors = {}
-    for plan in plans:
-        plan_vector_directory = f'{input_directory}plan_vectors/vectors_PLAN{build_plan_name(chamber, plan)}/'
+    return {plan: load_plan_vector(chamber, directory, statistic_name, plan) for plan in plans}
 
-        path = f'{plan_vector_directory}{statistic_name}_vector.csv'
-        plan_vectors[plan] = load_numpy_csv(path)
 
-    return plan_vectors
+def load_plan_vector(chamber: str, directory: str, statistic_name: str, plan: int) -> np.ndarray:
+    plan_vector_directory = f'{directory}plan_vectors/vectors_PLAN{build_plan_name(chamber, plan)}/'
+    path = f'{plan_vector_directory}{statistic_name}_vector.csv'
+    return load_numpy_csv(path)
 
 
 def build_seeds_directory(directory: str) -> str:

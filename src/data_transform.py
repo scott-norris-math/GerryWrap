@@ -152,26 +152,30 @@ def area(df: pd.DataFrame) -> pd.Series:
     return df['aland']
 
 
-def pres20_total(df: pd.DataFrame) -> pd.Series:
-    dem_votes = df['President_2020_general_D_Biden']
-    rep_votes = df['President_2020_general_R_Trump']
-    return dem_votes + rep_votes
+def pres20_D_total(df: pd.DataFrame) -> pd.Series:
+    return df['President_2020_general_D_Biden']
+
+
+def pres20_R_total(df: pd.DataFrame) -> pd.Series:
+    return df['President_2020_general_R_Trump']
 
 
 def pres20_percent(df: pd.DataFrame) -> pd.Series:
-    dem_votes = df['President_2020_general_D_Biden']
-    return dem_votes / pres20_total(df)
+    dem_votes = pres20_D_total(df)
+    return dem_votes / (dem_votes + pres20_R_total(df))
 
 
-def sen20_total(df: pd.DataFrame) -> pd.Series:
-    dem_votes = df['USSen_2020_general_D_Hegar']
-    rep_votes = df['USSen_2020_general_R_Cornyn']
-    return dem_votes + rep_votes
+def sen20_D_total(df: pd.DataFrame) -> pd.Series:
+    return df['USSen_2020_general_D_Hegar']
+
+
+def sen20_R_total(df: pd.DataFrame) -> pd.Series:
+    return df['USSen_2020_general_R_Cornyn']
 
 
 def sen20_percent(df: pd.DataFrame) -> pd.Series:
-    dem_votes = df['USSen_2020_general_D_Hegar']
-    return dem_votes / sen20_total(df)
+    dem_votes = sen20_D_total(df)
+    return dem_votes / (dem_votes + sen20_R_total(df))
 
 
 def build_census_population_groups() -> list[str]:
@@ -227,9 +231,11 @@ def build_election_filename_csv(election: str, statistic: str, suffix: str = '')
 
 def build_matrix_statistics_settings(chamber: str) -> list[tuple[str, Callable[[pd.DataFrame], pd.Series]]]:
     election_statistics = [(build_election_filename_prefix('PRES20', 'votes'), pres20_percent),
-                           (build_election_filename_prefix('PRES20', 'total'), pres20_total),
+                           (build_election_filename_prefix('PRES20', 'D_total'), pres20_D_total),
+                           (build_election_filename_prefix('PRES20', 'R_total'), pres20_R_total),
                            (build_election_filename_prefix('SEN20', 'votes'), sen20_percent),
-                           (build_election_filename_prefix('SEN20', 'total'), sen20_total)]
+                           (build_election_filename_prefix('SEN20', 'D_total'), sen20_D_total),
+                           (build_election_filename_prefix('SEN20', 'R_total'), sen20_R_total)]
     return election_statistics + list(
         itertools.chain(*(build_statistics_group_settings(x) for x in build_population_groups(chamber))))
 
@@ -249,14 +255,13 @@ def build_statistics_group_settings(group: str) -> list[tuple[str, Callable[[pd.
     ]
 
 
-def build_vector_statistics_settings(chamber: str) -> list[tuple[str, Callable[[pd.DataFrame], pd.Series]]]:
+def build_vector_statistics_settings() -> list[tuple[str, Callable[[pd.DataFrame], pd.Series]]]:
     statistics = [
         (build_election_filename_prefix(election, statistic), lambda x: statistic_func(np.array(election_func(x))))
         for election, election_func in [('PRES20', pres20_percent), ('SEN20', sen20_percent)]
         for statistic, statistic_func in [('mean_median', calculate_mean_median),
                                           ('partisan_bias', calculate_partisan_bias),
-                                          ('partisan_gini', calculate_partisan_gini),
-                                          ('efficiency_gap', calculate_efficiency_gap)]]
+                                          ('partisan_gini', calculate_partisan_gini)]]
     return statistics
 
 
@@ -284,7 +289,7 @@ def calculate_partisan_bias(plan_vector: np.ndarray) -> float:
 
 
 def calculate_partisan_gini(plan_vector: np.ndarray) -> float:
-    # Code taken from gerrychain::partisan.py
+    # Code taken from gerrychain/metrics/partisan.py
     race_results = sorted(plan_vector, reverse=True)
     seats_votes = [plan_vector - r + 0.5 for r in race_results]
 
@@ -300,17 +305,25 @@ def calculate_partisan_gini(plan_vector: np.ndarray) -> float:
     return unscaled_area / len(race_results)
 
 
-def calculate_efficiency_gap(plan_vector: np.ndarray) -> float:
-    return sum([x if x < .5 else x - .5 for x in plan_vector])
+def calculate_ensemble_wasted_votes(party1_votes, party2_votes):
+    wasted_votes = np.zeros(np.shape(party1_votes))
+    total = np.sum(party1_votes[0] + party2_votes[0])
+    for i, (party1_row, party2_row) in enumerate(zip(party1_votes, party2_votes)):
+        wasted_votes[i] = calculate_wasted_votes(party1_row, party2_row, total)
+    return wasted_votes
 
 
-def build_canonical_assignments_list(assignments: list[tuple[int, int]]) -> list[list[int]]:
-    partition_dictionary = defaultdict(list)
-    for unit, district in assignments:
-        partition_dictionary[district].append(unit)
-    partition_list = [sorted(x) for x in partition_dictionary.values()]
-    partition_list.sort(key=lambda x: x[0])
-    return partition_list
+def calculate_wasted_votes(party1_votes: np.ndarray, party2_votes: np.ndarray, total: float) -> np.ndarray:
+    return np.array([(x - y) / 2 if x > y else x for x, y in zip(party1_votes, party2_votes)]) / total
+
+
+def calculate_efficiency_gap(ensemble_directory: str, election: str) -> np.ndarray:
+    votes_D = cm.load_ensemble_matrix(ensemble_directory, f'{election}_D_total')
+    votes_R = cm.load_ensemble_matrix(ensemble_directory, f'{election}_R_total')
+    wasted_votes_D = calculate_ensemble_wasted_votes(votes_D, votes_R)
+    wasted_votes_R = calculate_ensemble_wasted_votes(votes_R, votes_D)
+    efficiency_gap = np.sum(wasted_votes_R - wasted_votes_D, axis = 1)
+    return efficiency_gap
 
 
 def load_filtered_redistricting_data(chamber: str, directory: str, redistricting_data_filename: str, cvap_filename: str,
@@ -421,6 +434,7 @@ def save_redistricting_county_vtd_data(directory: str) -> None:
         }
 
     redistricting_data = sa.load_redistricting_data(directory)
+    si.fix_election_columns_text(redistricting_data)
     geometry_df = redistricting_data.filter(items=['cntyvtd', 'polygon']).copy()
     redistricting_data.drop(
         columns=['county', 'tabblock', 'bg', 'tract', 'cnty', 'cd', 'sldu', 'sldl', 'polygon'],
@@ -503,10 +517,10 @@ def save_data_frame(data_frame: pd.DataFrame, output_path_prefix: str) -> None:
 
 def group_data_frame_by_ids(data_frame: pd.DataFrame, data_frame_id_to_group_ids: dict[str, str]) -> pd.DataFrame:
     data_frame['group_id'] = [data_frame_id_to_group_ids[x] for x in list(data_frame.index.values)]
-    data_frame_group_sums = data_frame.groupby('group_id').sum()
-    data_frame_group_sums.index.rename('geoid', inplace=True)
-    data_frame_group_sums.sort_values(by=['geoid'], inplace=True)
-    return data_frame_group_sums
+    sums_df = data_frame.groupby('group_id').sum()
+    sums_df.index.rename('geoid', inplace=True)
+    sums_df.sort_values(by=['geoid'], inplace=True)
+    return sums_df
 
 
 def match_census_block_ids(graph: nx.Graph, block_ids: list[str], county_vtd_lookup: dict[str, str]) -> dict[str, str]:
@@ -654,10 +668,10 @@ def build_ensemble_matrix_saver(chamber: str, directory: str, ensemble_descripti
     return build()
 
 
-def build_ensemble_vector_saver(chamber: str, directory: str, ensemble_description: str, force: bool,
+def build_ensemble_vector_saver(directory: str, ensemble_description: str, force: bool,
                                 plans: np.ndarray) -> tuple[list, Callable, Callable]:
     def build() -> tuple[list, Callable, Callable]:
-        statistics_settings = build_vector_statistics_settings(chamber)
+        statistics_settings = build_vector_statistics_settings()
         statistics_paths = {x: f'{cm.build_ensemble_directory(directory, ensemble_description)}{x}.npz'
                             for x, _ in statistics_settings}
         statistics_settings = [(x, y) for x, y in statistics_settings if force or not exists(statistics_paths[x])]
@@ -685,7 +699,7 @@ def save_ensemble_data(chamber: str, directory: str, redistricting_data_filename
     node_data = load_filtered_redistricting_data(chamber, directory, redistricting_data_filename, cvap_filename)
 
     computers = [build_ensemble_matrix_saver(chamber, directory, ensemble_description, force, plans),
-                 build_ensemble_vector_saver(chamber, directory, ensemble_description, force, plans)]
+                 build_ensemble_vector_saver(directory, ensemble_description, force, plans)]
 
     print("Saving ensemble data for: ")
     statistics = [y for x in computers for y in x[0]]
@@ -944,6 +958,9 @@ if __name__ == '__main__':
                         convert_to_csv(ensemble_directory, f'pop_{population_group}')
 
         if False:
+            save_vra_county_countyvtd_data(chamber, directory)
+
+        if False:
             seeds_directory = cm.build_seeds_directory(directory)
             dual_graph = nx.read_gpickle(seeds_directory + settings.dual_graph_filename)
 
@@ -964,11 +981,6 @@ if __name__ == '__main__':
 
             # df = pd.read_parquet(merged_data_meeting_path)
             # save_numpy_arrays(chamber, df, merged_data_directory)
-
-        if False:
-            assignments = [(3, 1), (2, 1), (1, 3), (17, 4), (27, 1)]
-            canonical_list = build_canonical_assignments_list(assignments)
-            print(canonical_list)
 
         print('done')
 

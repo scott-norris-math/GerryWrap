@@ -25,8 +25,14 @@ import proposed_plans as pp
 
 
 def build_canonical_partition_list(partition: Partition) -> list[list[int]]:
-    partition_assignment = [(x, partition.assignment[x]) for x in partition.graph.nodes]
-    return dt.build_canonical_assignments_list(partition_assignment)
+    assignments = [(x, partition.assignment[x]) for x in partition.graph.nodes]
+
+    partition_dictionary = defaultdict(list)
+    for unit, district in assignments:
+        partition_dictionary[district].append(unit)
+    partition_list = [sorted(x) for x in partition_dictionary.values()]
+    partition_list.sort(key=lambda x: x[0])
+    return partition_list
 
 
 def build_canonical_plan_from_partition(node_id_to_index: dict[str, int], partition: Partition) -> frozenset[frozenset]:

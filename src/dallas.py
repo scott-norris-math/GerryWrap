@@ -1,20 +1,31 @@
+import addict
 from collections import defaultdict
+from datetime import datetime
 import geopandas as gpd
 from gerrychain import GeographicPartition, Graph
+import glob
+from google.cloud import storage
+from google import auth
+import json
 import maup as mp
 import math
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FormatStrFormatter, PercentFormatter
 import numpy as np
+import os
 import pandas as pd
 from scipy import stats
 from shapely import wkt
+import shutil
+import sys
+import time
 
 import common as cm
 import data_transform as dt
 import GerryWrap as gw
 import partitions_analysis as pa
 import plan_statistics as ps
+import plans_scraper as pls
 import plotting as pl
 import proposed_plans as pp
 import reporting
@@ -127,7 +138,6 @@ def save_current_proposed_plans_plot(chamber: str, directory: str, election: str
         ensemble_partisan_bias_probs[plan_partisan_bias] = len(partisan_bias_group) / chainlength
         print(f'{plan_partisan_bias} {ensemble_partisan_bias_probs[plan_partisan_bias]} {np.median(partisan_bias_group)} {np.average(partisan_bias_group)}')
 
-    plt.rcParams['figure.figsize'] = [15, 15]
     violin_values = [plan_partisan_bias_groups[x] for x in ensemble_partisan_biases]
     pc_thresh = .01
 
@@ -140,6 +150,13 @@ def save_current_proposed_plans_plot(chamber: str, directory: str, election: str
     for plan_partisan_bias in plan_partisan_bias_groups:
         plan_partisan_bias_groups[plan_partisan_bias] = list(sorted(plan_partisan_bias_groups[plan_partisan_bias], key=lambda x: x[1], reverse=True))
 
+    plt.figure(figsize=(15, 15))
+
+    max_prob = max(ensemble_partisan_bias_probs.values())
+    widths = [.8 * ensemble_partisan_bias_probs[x] / max_prob for x in ensemble_partisan_biases]
+    plt.violinplot(violin_values, ensemble_partisan_biases, showextrema=False, widths=widths,
+                   quantiles=[[pc_thresh, .5, 1 - pc_thresh] for _ in ensemble_partisan_biases])
+
     plans_metadata = pp.load_plans_metadata(chamber, pp.build_plans_directory(directory))
     offset = -.005
     for plan_partisan_bias in sorted(plan_partisan_bias_groups):
@@ -147,6 +164,11 @@ def save_current_proposed_plans_plot(chamber: str, directory: str, election: str
         for plan_number, plan_mean_median in plan_partisan_bias_groups[plan_partisan_bias]:
             plan_metadata = plans_metadata.loc[plan_number]
             plt.plot(plan_partisan_bias, plan_mean_median, 'rs')
+
+            if "betzen" in str(plan_metadata.description).lower() and plan_number > 103120:
+                print(f"{plan_partisan_bias} {plan_mean_median} {plan_number}")
+                continue
+
             if plan_mean_median - y_last[plan_partisan_bias] > offset:
                 y_last[plan_partisan_bias] = y_last[plan_partisan_bias] + offset
             else:
@@ -159,11 +181,6 @@ def save_current_proposed_plans_plot(chamber: str, directory: str, election: str
                                xytext=(x_coordinate, y_coordinate), textcoords='data',
                                arrowprops=dict(arrowstyle='-', relpos=(0,0.5)))
 
-    max_prob = max(ensemble_partisan_bias_probs.values())
-    widths = [.8 * ensemble_partisan_bias_probs[x] / max_prob for x in ensemble_partisan_biases]
-    plt.violinplot(violin_values, ensemble_partisan_biases, showextrema=False, widths=widths,
-                   quantiles=[[pc_thresh, .5, 1 - pc_thresh] for _ in ensemble_partisan_biases])
-
     plt.xlabel("Partisan Bias")
     plt.ylabel("Mean Median")
     plt.gca().yaxis.set_major_formatter(PercentFormatter(1.0, 0))
@@ -172,10 +189,164 @@ def save_current_proposed_plans_plot(chamber: str, directory: str, election: str
     plt.savefig(f'{directory}dallasCityCouncilPlans.png')
 
 
+def backup_plans_metadata(chamber: str, plans_directory: str) -> None:
+    source_path = pp.build_plans_metadata_path(chamber, plans_directory)
+    target_path = pp.build_plans_metadata_path(chamber, f'{plans_directory}/backups/',
+                                               f'_{datetime.now().strftime("%m_%d_%y_%H_%M_%S_%f")}')
+    shutil.copyfile(source_path, target_path)
+
+
+def retrieve_new_plans_metadata(known_plans: set[int]) -> list:
+    plans_response = pls.retrieve_web_page(
+        'https://districtr.org/.netlify/functions/eventRead?skip=0&limit=9&event=cityofdallas')
+    plans = [x for x in addict.Dict(json.loads(plans_response)).plans if x.plan.problem.name == 'City Council']
+
+    duplicate_plans = [x for x in plans if x['simple_id'] in known_plans]
+    if not any(duplicate_plans):
+        raise NotImplementedError("No already known plans")
+
+    return [{
+        'plan': x['simple_id'],
+        'description': x['planName'].strip(),
+        'submitter': '',
+        'previous_plan': 0,
+        'changed_rows': 0,
+        'invalid': 0
+    } for x in plans if not x['simple_id'] in known_plans]
+
+
+def download_plan_raw(chamber: str, directory: str, plan: int) -> None:
+    def parse_district(x) -> int:
+        if type(x) is list:
+            length = len(x)
+            if length != 1:
+                error_message = f'Error parsing district {x}'
+                raise RuntimeError(error_message)
+            return x[0]
+        else:
+            return x
+
+    print(f"Downloading: {plan}")
+    plan_response = pls.retrieve_web_page(f'https://districtr.org/.netlify/functions/planRead?id={plan}')
+    plan_response_dictionary = addict.Dict(json.loads(plan_response))
+    rows = ['id-dallastx-dallastx_blocks-14-CouncilDistricts,assignment'] + \
+           [f'{x},{parse_district(y)}' for x, y in plan_response_dictionary.plan.assignment.items()]
+
+    cm.save_all_text("\n".join(rows), pp.build_plan_raw_path(chamber, directory, plan))
+
+    print("Download Sleep")
+    time.sleep(30)
+
+
+def upload_to_bucket(credentials_path: str, file_path: str, bucket_name: str, blob_path: str) -> None:
+    storage_client = storage.Client.from_service_account_json(credentials_path)
+
+    bucket = storage_client.get_bucket(bucket_name)
+    blob = bucket.blob(blob_path)
+
+    print(f"Uploading {file_path} to {bucket_name} {blob_path}")
+    blob.upload_from_filename(file_path)
+
+
+def process_new_plans(chamber: str, directory: str, election: str, min_plan: int):
+    plans_directory = pp.build_plans_directory(directory)
+    plans_metadata = pp.load_plans_metadata(chamber, plans_directory)
+    pp.save_current_merged_plans(chamber, directory, plans_metadata, force=False)
+
+    pp.save_current_plan_vectors(chamber, directory)
+    pp.save_plan_vectors_summary(chamber, directory)
+    pp.save_plan_vectors_differences(chamber, directory, cm.determine_original_plan(chamber))
+
+    save_current_proposed_plans_plot(chamber, directory, election)
+
+    ps.save_plan_statistics([chamber], directory)
+
+    sa.save_plan_seeds(chamber, directory, min_plan)
+
+    pl.save_proposed_plan_diff_maps(chamber, directory, min_plan)
+
+    pl.FAST_PLOTTING = True
+    pl.save_plots(chamber, directory, min_plan)
+
+    reporting.save_reports(chamber, directory, min_plan)
+
+    upload_to_google_storage(chamber, directory, min_plan)
+
+
+def process_proposed_plans_pages(directory: str, election: str, known_plans: set[int]) -> set[int]:
+    chamber = 'DCN'
+
+    new_plans_metadata = retrieve_new_plans_metadata(known_plans)
+    new_plans = list(sorted(x['plan'] for x in new_plans_metadata))
+
+    if any(new_plans):
+        print(f"New Plan Found: {new_plans}")
+
+        plans_directory = pp.build_plans_directory(directory)
+        plans_metadata_df = pls.update_plans_metadata(chamber, plans_directory, new_plans_metadata)
+        known_plans = set(plans_metadata_df['plan'])
+
+        for plan in new_plans:
+            download_plan_raw(chamber, directory, plan)
+
+        process_new_plans(chamber, directory, election, min(new_plans))
+
+    return known_plans
+
+
+def get_downloaded_plans(chamber: str, plans_raw_directory: str) -> set[int]:
+    plans = set()
+    for path in glob.glob(f'{plans_raw_directory}PLAN{cm.encode_chamber(chamber)}*.csv'):
+        path = os.path.normpath(path)
+        plan_string = str(path.replace(os.path.dirname(path), '').removesuffix('.csv')[1:]). \
+            removeprefix(f'PLAN{cm.encode_chamber(chamber)}')
+        plans.add(int(plan_string))
+    return plans
+
+
+def upload_to_google_storage(chamber: str, directory: str, min_plan: int) -> None:
+    credentials_path = f'{directory}config/google_cloud_credentials.json'
+    bucket_name = 'mum_project'
+
+    if chamber == 'DCN':
+        upload_to_bucket(credentials_path, f'{directory}dallasCityCouncilPlans.png', bucket_name,
+                         'dallasCityCouncilPlans.png')
+
+    plans_directory = pp.build_plans_directory(directory)
+    plans_metadata = pp.load_plans_metadata(chamber, plans_directory)
+    plans = [x for x in plans_metadata['plan'] if x >= min_plan]
+    for plan in plans:
+        diff_map_path = f'{pl.build_diff_map_path_prefix(chamber, directory, plan)}.pdf'
+        upload_to_bucket(credentials_path, diff_map_path, bucket_name, diff_map_path.removeprefix(directory))
+
+        report_directory, report_filename_prefix = cm.build_reports_directory_and_filename(chamber, directory,
+                                                                                           plan)
+        report_path = f'{report_directory}{report_filename_prefix}.pdf'
+        upload_to_bucket(credentials_path, report_path, bucket_name, report_path.removeprefix(directory))
+
+
+def run(directory: str, election: str) -> None:
+    sys.excepthook = pls.handle_exception
+
+    known_plans = get_downloaded_plans('DCN', pp.build_plans_raw_directory(directory))
+    print(f"Initial Plans: {pls.format_plans(known_plans)}")
+
+    while True:
+        print(datetime.now().strftime("%H:%M:%S"))
+
+        known_plans = process_proposed_plans_pages(directory, election, known_plans)
+
+        print("Sleeping")
+        time.sleep(10 * 60)
+
+
 if __name__ == '__main__':
     def main() -> None:
-        directory = 'G:/rob/projects/election/rob/'
+        # Have to set the key log file to nothing or else we get a permission error
+        pls.disable_ssl_logging()
+
         chamber = 'DCN'
+        directory = 'G:/rob/projects/election/rob/'
         election = 'SEN20'
 
         pl.register_colormap()
@@ -183,34 +354,17 @@ if __name__ == '__main__':
         if False:
             save_current_DCN_plan(directory)
 
-        if True:
+        if False:
             save_current_proposed_plans_plot(chamber, directory, election)
+
+        if True:
+            run(directory, election)
 
         if False:
-            plans_directory = pp.build_plans_directory(directory)
-            plans_metadata = pp.load_plans_metadata(chamber, plans_directory)
-            pp.save_current_merged_plans(chamber, directory, plans_metadata, force=False)
+            process_new_plans(chamber, directory, election, 103506)
 
-            pp.save_current_plan_vectors(chamber, directory)
-            pp.save_plan_vectors_summary(chamber, directory)
-            pp.save_plan_vectors_differences(chamber, directory, cm.determine_original_plan(chamber))
-
-            min_plan = 101652
-
-            sa.save_plan_seeds(chamber, directory, min_plan)
-
-            pl.save_proposed_plan_diff_maps(chamber, directory, min_plan)
-
-            pl.FAST_PLOTTING = True
-            pl.save_plots(chamber, directory, min_plan)
-
-            reporting.save_reports(chamber, directory, min_plan)
-
-            save_current_proposed_plans_plot(chamber, directory, election)
-
-            ps.save_plan_statistics([chamber], directory)
-
-            # TODO: upload diff_map, report, plans plot
+        if False:
+            upload_to_google_storage(chamber, directory, 203120)
 
 
-main()
+    main()

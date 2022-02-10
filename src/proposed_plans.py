@@ -1,6 +1,5 @@
 from collections import defaultdict
 import geopandas as gpd
-import glob
 import itertools
 import matplotlib.pyplot as plt
 import networkx as nx
@@ -168,8 +167,8 @@ def build_plans_directory(directory: str) -> str:
     return f'{directory}plans/'
 
 
-def build_plan_metadata_path(chamber: str, plan_directory: str) -> str:
-    return f'{plan_directory}plans_metadata_{chamber}.csv'
+def build_plans_metadata_path(chamber: str, plan_directory: str, suffix: str = '') -> str:
+    return f'{plan_directory}plans_metadata_{chamber}{suffix}.csv'
 
 
 def build_plan_path(chamber: str, directory: str, plan: int) -> str:
@@ -303,35 +302,40 @@ def build_redistricting_data_calculated_directory(directory: str) -> str:
     return directory + 'redistricting_data_calculated/'
 
 
-def pres20_total_vector(df: pd.DataFrame) -> pd.Series:
-    dem_votes = df['President_2020_D_Biden_general']
-    rep_votes = df['President_2020_R_Trump_general']
-    return dem_votes + rep_votes
+def pres20_D_total_vector(df: pd.DataFrame) -> pd.Series:
+    return df['President_2020_D_Biden_general']
+
+
+def pres20_R_total_vector(df: pd.DataFrame) -> pd.Series:
+    return df['President_2020_R_Trump_general']
 
 
 def pres20_percent_vector(df: pd.DataFrame) -> pd.Series:
-    dem_votes = df['President_2020_D_Biden_general']
-    return dem_votes / pres20_total_vector(df)
+    dem_votes = pres20_D_total_vector(df)
+    return dem_votes / (dem_votes + pres20_R_total_vector(df))
 
 
-def sen20_total_vector(df: pd.DataFrame) -> pd.Series:
-    dem_votes = df['USSen_2020_D_Hegar_general']
-    rep_votes = df['USSen_2020_R_Cornyn_general']
-    return dem_votes + rep_votes
+def sen20_D_total_vector(df: pd.DataFrame) -> pd.Series:
+    return df['USSen_2020_D_Hegar_general']
+
+
+def sen20_R_total_vector(df: pd.DataFrame) -> pd.Series:
+    return df['USSen_2020_R_Cornyn_general']
 
 
 def sen20_percent_vector(df: pd.DataFrame) -> pd.Series:
-    dem_votes = df['USSen_2020_D_Hegar_general']
-    return dem_votes / sen20_total_vector(df)
+    dem_votes = sen20_D_total_vector(df)
+    return dem_votes / (dem_votes + sen20_R_total_vector(df))
 
 
 def build_statistics_vector_settings(chamber: str) -> list[tuple[str, Callable[[pd.DataFrame], pd.Series]]]:
-    misc_statistics = []  # [('area', dt.area)]
     election_statistics = [(dt.build_election_filename_csv('PRES20', 'votes', 'vector'), pres20_percent_vector),
-                           (dt.build_election_filename_csv('PRES20', 'total', 'vector'), pres20_total_vector),
+                           (dt.build_election_filename_csv('PRES20', 'D_total', 'vector'), pres20_D_total_vector),
+                           (dt.build_election_filename_csv('PRES20', 'R_total', 'vector'), pres20_R_total_vector),
                            (dt.build_election_filename_csv('SEN20', 'votes', 'vector'), sen20_percent_vector),
-                           (dt.build_election_filename_csv('SEN20', 'total', 'vector'), sen20_total_vector)]
-    return misc_statistics + election_statistics + list(
+                           (dt.build_election_filename_csv('SEN20', 'D_total', 'vector'), sen20_D_total_vector),
+                           (dt.build_election_filename_csv('SEN20', 'R_total', 'vector'), sen20_R_total_vector)]
+    return election_statistics + list(
         itertools.chain(*(build_statistics_vector_group_settings(x) for x in dt.build_population_groups(chamber))))
 
 
@@ -435,16 +439,6 @@ def save_vra_plan_vectors(chamber: str, directory: str, graph: nx.Graph, plan: i
 
 def build_plan_vectors_directory(chamber: str, directory: str, plan: int) -> str:
     return f'{directory}plan_vectors/vectors_PLAN{cm.encode_chamber(chamber)}{plan}/'
-
-
-def get_known_plans(chamber: str, plans_raw_directory: str) -> set[int]:
-    plans = set()
-    for path in glob.glob(f'{plans_raw_directory}plan{cm.encode_chamber(chamber)}*_blk.zip'):
-        path = os.path.normpath(path)
-        plan_string = str(path.replace(os.path.dirname(path), '').removesuffix('_blk.zip')[1:]). \
-            removeprefix(f'plan{cm.encode_chamber(chamber).lower()}')
-        plans.add(int(plan_string))
-    return plans
 
 
 def save_current_merged_plans(chamber: str, directory: str, plans_metadata: pd.DataFrame, force=False) -> None:
@@ -602,14 +596,14 @@ def save_plan_vectors_impl(chamber: str, directory: str, process, output_path: s
 
 
 def load_plans_metadata(chamber: str, plans_directory: str) -> pd.DataFrame:
-    plans_metadata = pd.read_csv(build_plan_metadata_path(chamber, plans_directory))
+    plans_metadata = pd.read_csv(build_plans_metadata_path(chamber, plans_directory))
     plans_metadata.sort_values('plan', inplace=True)
     plans_metadata.set_index('plan', drop=False, inplace=True)
     return plans_metadata
 
 
 def save_plans_metadata(chamber: str, plans_directory: str, plans_metadata: pd.DataFrame) -> None:
-    plans_metadata.to_csv(build_plan_metadata_path(chamber, plans_directory), index=False)
+    plans_metadata.to_csv(build_plans_metadata_path(chamber, plans_directory), index=False)
 
 
 def determine_valid_plans(plans_metadata_df: pd.DataFrame) -> set[int]:
@@ -892,7 +886,7 @@ if __name__ == '__main__':
             plans_metadata = load_plans_metadata(chamber, plans_directory)
             save_current_merged_plans(chamber, directory, plans_metadata, force=False)
 
-        if False:
+        if True:
             for chamber in cm.CHAMBERS + ['DCN']:  # ['USCD']:  #
                 print(f"Chamber: {chamber}")
                 # process_tabblock_data(chamber, directory)

@@ -21,7 +21,7 @@ def get_comparison_market_size(districts: int) -> int:
 
 
 def vote_vector_ensemble_comps(ensemble_transposed: np.ndarray, title: str, pc_thresh: float = 0.01,
-                               have_actual: bool = True, comp_plans=False, comp_plans_vv: list[np.ndarray] = [],
+                               have_actual: bool = True, comp_plans=False, comp_plans_vectors: list[np.ndarray] = [],
                                comp_plans_names: list[str] = [], comp_plans_colors: list[str] = [],
                                comp_plans_pnums: list[bool] = [], fill_color=None, h_line_label: str = '',
                                y_axis_label: str = '') -> Any:
@@ -75,7 +75,7 @@ def vote_vector_ensemble_comps(ensemble_transposed: np.ndarray, title: str, pc_t
     # -----------------------------------------------
 
     # Create the plot
-    myplot = plt.figure(figsize=(6.5, 3.5))
+    figure = plt.figure(figsize=(6.5, 3.5))
 
     violin_parts = plt.violinplot(vs_ensemble, district_numbers, showextrema=False, widths=0.6,
                                   quantiles=[[pc_thresh, 1 - pc_thresh] for _ in district_numbers])
@@ -128,8 +128,8 @@ def vote_vector_ensemble_comps(ensemble_transposed: np.ndarray, title: str, pc_t
 
     # "Comparison Plans", if applicable
     if comp_plans:
-        for i in np.arange(len(comp_plans_vv)):
-            y1 = np.array(sorted(comp_plans_vv[i]))
+        for i in np.arange(len(comp_plans_vectors)):
+            y1 = np.array(sorted(comp_plans_vectors[i]))
             plt.plot(district_numbers, y1, color=comp_plans_colors[i], marker='o', markersize=marker_size, ls='',
                      label=comp_plans_names[i])
 
@@ -140,7 +140,7 @@ def vote_vector_ensemble_comps(ensemble_transposed: np.ndarray, title: str, pc_t
         whpnum = true_pnums[0]
 
         # Order of districts for x-axis
-        dnumvec = np.argsort(comp_plans_vv[whpnum])
+        dnumvec = np.argsort(comp_plans_vectors[whpnum])
 
         # Use dnumvec computed above
         dnumstr = [str(x + 1) for x in dnumvec]
@@ -156,8 +156,8 @@ def vote_vector_ensemble_comps(ensemble_transposed: np.ndarray, title: str, pc_t
         # Get min and max of comparison plans 
         ymin = 0.5
         ymax = 0.5
-        for i in np.arange(len(comp_plans_vv)):
-            y1 = np.array(sorted(comp_plans_vv[i]))
+        for i in np.arange(len(comp_plans_vectors)):
+            y1 = np.array(sorted(comp_plans_vectors[i]))
             ymin = np.min([y1[0], ymin])
             ymax = np.max([y1[-1], ymax])
 
@@ -170,7 +170,7 @@ def vote_vector_ensemble_comps(ensemble_transposed: np.ndarray, title: str, pc_t
     plt.title(title)
     plt.legend(loc=2, fontsize=8)
     plt.tight_layout()
-    return myplot
+    return figure
 
 
 def calculate_ensemble_district_statistics(ensemble_transposed: list[list[float]], pc_thresh: float) -> \
@@ -645,23 +645,21 @@ def mean_median_partisan_bias(ensemble_transposed: np.ndarray, have_actual: bool
     myfigure = plt.figure(figsize=(6.5, 3.5))
     axes = plt.subplot(121)
 
-    plot_mean_median_hist(axes, have_actual, comparison_label, majority_vs)
+    plot_mean_median_hist(axes, have_actual, comparison_label, majority_vs[1, :] - majority_vs[0, :])
 
     # Partisan Bias
     plt.subplot(122)
 
-    plot_partisan_bias_hist(have_actual, comparison_label, number_seats)
+    plot_partisan_bias_hist(have_actual, comparison_label, number_seats[0, :] - number_seats[1, :])
 
     plt.tight_layout()
 
     return myfigure
 
 
-def plot_mean_median_hist(axes, have_actual: bool, comparison_label: str, majority_vs: np.ndarray) -> None:
+def plot_mean_median_hist(axes, have_actual: bool, comparison_label: str, mean_medians_ensemble: np.ndarray) -> None:
     # things we need to plot
-    mean_medians_ensemble = majority_vs[1, :] - majority_vs[0, :]
     mvdiff = np.median(mean_medians_ensemble)
-    cvdiff = mean_medians_ensemble[0]
 
     # for making it look nice
     vdmin = min(mean_medians_ensemble)
@@ -675,8 +673,8 @@ def plot_mean_median_hist(axes, have_actual: bool, comparison_label: str, majori
     plt.hist(mean_medians_ensemble, bins=vbinbounds, color="xkcd:dark blue", **{'alpha': 0.3})
 
     plt.axvline(x=mvdiff, color="green", ls='--', lw=2.5, ymax=0.75, label="Ensemble Median")
-
     if have_actual:
+        cvdiff = mean_medians_ensemble[0]
         plt.axvline(x=cvdiff, color="purple", ls='--', lw=2.5, ymax=0.75, label=comparison_label)
 
     plt.xlim(vdmin - vdbuff, vdmax + vdbuff)
@@ -694,11 +692,9 @@ def plot_mean_median_hist(axes, have_actual: bool, comparison_label: str, majori
     plt.legend(loc="upper center")
 
 
-def plot_partisan_bias_hist(have_actual: bool, comparison_label: str, number_seats: np.ndarray) -> None:
+def plot_partisan_bias_hist(have_actual: bool, comparison_label: str, partisan_biases_ensemble: np.ndarray) -> None:
     # things we need to plot
-    partisan_biases_ensemble = number_seats[0, :] - number_seats[1, :]
     mndiff = np.median(partisan_biases_ensemble)
-    cndiff = partisan_biases_ensemble[0]
 
     # for making it look nice
     ndmin = min(partisan_biases_ensemble)
@@ -713,6 +709,7 @@ def plot_partisan_bias_hist(have_actual: bool, comparison_label: str, number_sea
 
     plt.axvline(x=mndiff, color="green", ls='--', lw=2.5, ymax=0.75, label="Ensemble Median")
     if have_actual:
+        cndiff = partisan_biases_ensemble[0]
         plt.axvline(x=cndiff, color="purple", ls='--', lw=2.5, ymax=0.75, label=comparison_label)
     plt.xlim(ndmin - ndbuff, ndmax + ndbuff)
     plt.ylim(0, np.max(nhist) * 1.4)

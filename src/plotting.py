@@ -180,7 +180,7 @@ def hist_ensemble_comps(chamber: str, ensemble_matrix: np.ndarray, perc_thresh: 
         plt.rc('legend', fontsize=SMALL_SIZE)  # legend fontsize
         plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
-    plot, ax = plt.subplots(1, 1, figsize=(14, 10))
+    figure, ax = plt.subplots(1, 1, figsize=(14, 10))
 
     hist_y_axis_label = 'Plans'
 
@@ -213,7 +213,7 @@ def hist_ensemble_comps(chamber: str, ensemble_matrix: np.ndarray, perc_thresh: 
     plt.tight_layout()
     plt.legend(loc=2)
 
-    return plot
+    return figure
 
 
 def save_seats_voteshares_ensemble_comps_plot(chamber: str, output_directory: str, election: str,
@@ -223,14 +223,15 @@ def save_seats_voteshares_ensemble_comps_plot(chamber: str, output_directory: st
                                               plan_colors: list[str]) -> None:
     plot_title = get_chamber_pretty_name(chamber) + ' District Results  (' + determine_election_pretty_name(election) + ')'
 
-    plot = save_violin_comparison_plots(chamber, ensemble_matrix, current_plan, comparison_plan, plan_pnums,
+    figure = save_violin_comparison_plots(chamber, ensemble_matrix, current_plan, comparison_plan, plan_pnums,
                                         plan_legend_names, plan_colors, plan_vectors, plot_title,
                                         None, h_line_label="Needed to Win", y_axis_label="Democratic Vote Share")
 
-    plot.savefig(
+    figure.savefig(
         f'{output_directory}seats-voteshares-ensemble-comps-{chamber}-{current_plan}-{comparison_plan}-{election}.pdf')
 
-    plt.rcParams.update(plt.rcParamsDefault)
+    plt.close(figure)
+    reset_rcParams()
 
 
 def save_violin_comparison_plots(chamber: str, ensemble_matrix: np.ndarray, current_plan: Optional[int],
@@ -254,7 +255,7 @@ def save_violin_comparison_plots(chamber: str, ensemble_matrix: np.ndarray, curr
 
     set_x_axis_tick_size(chamber)
     return gw.vote_vector_ensemble_comps(ensemble_matrix, plot_title, pc_thresh=.01, have_actual=False,
-                                         comp_plans=True, comp_plans_vv=comparison_plans,
+                                         comp_plans=True, comp_plans_vectors=comparison_plans,
                                          comp_plans_names=plan_legend_names, comp_plans_colors=plan_colors,
                                          comp_plans_pnums=plan_pnums, fill_color=fill_color, h_line_label=h_line_label,
                                          y_axis_label=y_axis_label)
@@ -270,23 +271,26 @@ def save_vote_vector_ensemble_plot(chamber: str, output_directory: str, election
         election) + ')'
 
     set_x_axis_tick_size(chamber)
-    plot = gw.vote_vector_ensemble(np.column_stack([plan_vectors[plan], ensemble_matrix]), plot_title, pc_thresh=.01,
+    figure = gw.vote_vector_ensemble(np.column_stack([plan_vectors[plan], ensemble_matrix]), plot_title, pc_thresh=.01,
                                    have_actual=True, comparison_label=build_plan_label(chamber, plan),
                                    display_districts_numbers=(chamber != 'TXHD'))
 
-    plot.savefig(f'{output_directory}seats-voteshares-ensemble-enacted-{chamber}-{plan}-{election}.pdf')
+    figure.savefig(f'{output_directory}seats-voteshares-ensemble-enacted-{chamber}-{plan}-{election}.pdf')
 
-    plt.rcParams.update(plt.rcParamsDefault)
+    plt.close(figure)
+    reset_rcParams()
 
 
 def save_seats_votes_ensemble_plot(chamber: str, output_directory: str, election: str, ensemble_matrix: np.ndarray,
                                    plan: int, plan_vectors: dict[int, np.ndarray]) -> None:
     plot_title = get_chamber_pretty_name(chamber) + " Seats-Votes Curve (" + determine_election_pretty_name(election) + ")"
 
-    plot = gw.seats_votes_ensemble(np.column_stack([plan_vectors[plan], ensemble_matrix]), plot_title,
+    figure = gw.seats_votes_ensemble(np.column_stack([plan_vectors[plan], ensemble_matrix]), plot_title,
                                    have_actual=True)
 
-    plot.savefig(f'{output_directory}seats-votes-ensemble-enacted-{chamber}-{plan}-{election}.pdf')
+    figure.savefig(f'{output_directory}seats-votes-ensemble-enacted-{chamber}-{plan}-{election}.pdf')
+
+    plt.close(figure)
 
 
 def save_seats_votes_ensemble_inverted_plot(chamber: str, output_directory: str, election: str,
@@ -369,14 +373,15 @@ def save_racial_ensemble_comps_plot(chamber: str, output_directory: str, racial_
 
     group_fill_color = determine_racial_group_fill_color(racial_group)
 
-    plot = save_violin_comparison_plots(chamber, ensemble_matrix, current_plan, comparison_plan, plan_pnums,
+    figure = save_violin_comparison_plots(chamber, ensemble_matrix, current_plan, comparison_plan, plan_pnums,
                                         plan_legend_names, plan_colors, plan_vectors, title,
                                         fill_color=group_fill_color, h_line_label="Needed for Majority",
                                         y_axis_label=determine_population_group_pretty_name(population_group))
 
-    plot.savefig(f'{output_directory}violin-plot-{chamber}-{current_plan}-{comparison_plan}-{racial_group}-{population_group}{append_string("-", statistic)}.pdf')
+    figure.savefig(f'{output_directory}violin-plot-{chamber}-{current_plan}-{comparison_plan}-{racial_group}-{population_group}{append_string("-", statistic)}.pdf')
+    plt.close(figure)
 
-    plt.rcParams.update(plt.rcParamsDefault)
+    reset_rcParams()
 
 
 def build_vra_title(statistic: str) -> str:
@@ -428,15 +433,18 @@ def save_racial_histograms(chamber: str, output_directory: str, racial_group: st
     group_fill_color = determine_racial_group_fill_color(racial_group)
     for x in perc_thresh:
         hist_axis_label = f'Districts > {x * 100:.0f}%'
-        plot = hist_ensemble_comps(chamber, ensemble_matrix_transposed, x, plot_title, hist_axis_label,
+        figure = hist_ensemble_comps(chamber, ensemble_matrix_transposed, x, plot_title, hist_axis_label,
                                    group_fill_color, do_small_histogram_pics=do_small_histogram_pics,
                                    comp_plans=True, comp_plans_vv=comparison_plans,
                                    comp_plans_names=plan_legend_names, comp_plans_colors=plan_colors)
         size_string = 'small' if do_small_histogram_pics else 'large'
-        plot.savefig(
+
+        figure.savefig(
             f'{output_directory}hist-{size_string}-{chamber}-{current_plan}-{comparison_plan}-{racial_group}-{population_group}{append_string("-", statistic)}-{str(x)}.pdf')
 
-    plt.rcParams.update(plt.rcParamsDefault)
+        plt.close(figure)
+
+    reset_rcParams()
 
 
 def mask_plan(chamber: str, plan: Optional[int]) -> Optional[int]:
@@ -521,6 +529,7 @@ def save_election_racial_plots(chamber: str, root_directory: str, ensemble_direc
                 figure.savefig(output_path)
 
             clear_plots()
+    reset_rcParams()
 
 
 def build_plots_directory(directory: str, ensemble_description: str) -> str:
@@ -534,7 +543,7 @@ def draw_rainbow_map(partition: gerrychain.GeographicPartition) -> None:
 
 
 def reset_rcParams() -> None:
-    plt.rcParams.update(plt.rcParamsDefault)
+    plt.rcdefaults()
 
 
 def register_colormap() -> None:
@@ -736,12 +745,17 @@ def save_proposed_plan_diff_map(chamber: str, directory: str, plan: int) -> None
     coloring_assignment = calculate_equitable_coloring(partition)
     district_coloring_array, district_coloring_dict = build_district_coloring(coloring_assignment, partition)
 
-    reports_directory, report_filename_prefix = cm.build_reports_directory_and_filename(chamber, directory, plan)
-    diff_map_filename_prefix = f'{report_filename_prefix}_diff_map'
-    cm.save_vector_csv(f'{reports_directory}{diff_map_filename_prefix}_colors.csv', district_coloring_array)
+    diff_map_path_prefix = build_diff_map_path_prefix(chamber, directory, plan)
+
+    cm.save_vector_csv(f'{diff_map_path_prefix}_colors.csv', district_coloring_array)
 
     save_two_partition_map(chamber, partition, coloring_assignment, district_coloring_dict, partition_2010,
-                           f'{reports_directory}{diff_map_filename_prefix}')
+                           diff_map_path_prefix)
+
+
+def build_diff_map_path_prefix(chamber: str, directory: str, plan: int) -> str:
+    reports_directory, report_filename_prefix = cm.build_reports_directory_and_filename(chamber, directory, plan)
+    return f'{reports_directory}{report_filename_prefix}_diff_map'
 
 
 def save_two_partition_map(chamber: str, partition: gerrychain.GeographicPartition, coloring_assignment: dict[str, int],
@@ -804,10 +818,10 @@ def save_partition_districts_map(chamber: str, output_directory: str, partition:
 
 
 def clear_plots() -> None:
-    plt.figure().clear()
-    plt.close()
     plt.cla()
     plt.clf()
+    plt.figure().clear()
+    plt.close()
 
 
 def save_plots(chamber: str, directory: str, min_plan: Optional[int]) -> None:
