@@ -257,62 +257,113 @@ the value for the Proposed map is shown in red. In Figure~\ref{fig:5} we show th
 
 \section*{Appendix: All Plots}
 
-\begin{figure*}
+\begin{figure}
 {\centering \includegraphics[width=7.3307in,height=7in]{\VAR{report_directory}report_\VAR{plan_name}_diff_map.png} \par}
-\caption*{\href{\VAR{url_root}report_\VAR{plan_name}_diff_map.pdf}{Click here} to download a higher resolution version of this image.}
-\end{figure*}
+\caption{\href{\VAR{url_root}report_\VAR{plan_name}_diff_map.pdf}{Click here} to download a higher resolution version of this image.}
+\label{fig:plan_map}
+\end{figure}
 
+\begin{figure}
 {\centering \includegraphics[width=7.3307in,height=3.5in]{\VAR{plots_directory}seats-voteshares-ensemble-comps-\VAR{chamber}-\VAR{original_plan_mask}-\VAR{plan}-PRES20.pdf} \par}
 {\centering \includegraphics[width=7.3307in,height=3.5in]{\VAR{plots_directory}seats-voteshares-ensemble-comps-\VAR{chamber}-\VAR{original_plan_mask}-\VAR{plan}-SEN20.pdf} \par}
+\caption{Vote-share vectors for all districts, ordered by increasing Democratic vote share, for the 2020 Presidential (top) and US Senate (bottom) elections. Along with the ensemble (blue violins), vote-share vectors for the proposed (red) and current (green) plans are shown.}
+\label{fig:voteshares_ensem_comps}
+\end{figure}
 
+\begin{figure}
 {\centering \includegraphics[width=6.5in,height=3.5in]{\VAR{plots_directory}seats-voteshares-ensemble-enacted-\VAR{chamber}-\VAR{plan}-PRES20.pdf} \par}
-{\centering \includegraphics[width=5.8154in,height=3.1311in]{\VAR{plots_directory}mean-median-partisan-bias-ensemble-enacted-\VAR{chamber}-\VAR{plan}-PRES20.pdf} \par}
-{\centering \includegraphics[width=4.6909in,height=3.3752in]{\VAR{plots_directory}partisan-metrics-2D-\VAR{chamber}-\VAR{plan}-PRES20.pdf} \par}
+\caption{}
+\label{fig:seats-voteshares-ensemble-enacted-PRES20}
+\end{figure}
 
+\begin{figure}
+{\centering \includegraphics[width=5.8154in,height=3.1311in]{\VAR{plots_directory}mean-median-partisan-bias-ensemble-enacted-\VAR{chamber}-\VAR{plan}-PRES20.pdf} \par}
+\caption{}
+\label{fig:mean-median-partisan-bias-ensemble-enacted-PRES20}
+\end{figure}
+
+\begin{figure}
+{\centering \includegraphics[width=4.6909in,height=3.3752in]{\VAR{plots_directory}partisan-metrics-2D-\VAR{chamber}-\VAR{plan}-PRES20.pdf} \par}
+\caption{}
+\label{fig:partisan-metrics-2D-PRES20}
+\end{figure}
+
+\begin{figure}
 {\centering \includegraphics[width=6.5in,height=3.5in]{\VAR{plots_directory}seats-voteshares-ensemble-enacted-\VAR{chamber}-\VAR{plan}-SEN20.pdf} \par}
+\caption{}
+\label{fig:seats-voteshares-ensemble-enacted-SEN20}
+\end{figure}
+
+\begin{figure}
 {\centering \includegraphics[width=5.8154in,height=3.1311in]{\VAR{plots_directory}mean-median-partisan-bias-ensemble-enacted-\VAR{chamber}-\VAR{plan}-SEN20.pdf} \par}
+\caption{}
+\label{fig:}mean-median-partisan-bias-ensemble-enacted-SEN20
+\end{figure}
+
+\begin{figure}
 {\centering \includegraphics[width=4.6909in,height=3.3752in]{\VAR{plots_directory}partisan-metrics-2D-\VAR{chamber}-\VAR{plan}-SEN20.pdf} \par}
+\caption{}
+\label{fig:partisan-metrics-2D-SEN20}
+\end{figure}
 
 \BLOCK{ for population_group in population_groups }
+
+\begin{figure}
 {\centering \includegraphics[width=6.5in,height=3.5in]{\VAR{plots_directory}violin-plot-\VAR{chamber}-\VAR{original_plan_mask}-\VAR{plan}-B-\VAR{population_group}.pdf} \par}
+\caption{}
+\label{fig:}
+\end{figure}
+
+\begin{figure}
 {\centering \includegraphics[width=6.5in,height=3.5in]{\VAR{plots_directory}violin-plot-\VAR{chamber}-\VAR{original_plan_mask}-\VAR{plan}-H-\VAR{population_group}.pdf} \par}
+\caption{}
+\label{fig:}
+\end{figure}
+
+\begin{figure}
 {\centering \includegraphics[width=6.5in,height=3.5in]{\VAR{plots_directory}violin-plot-\VAR{chamber}-\VAR{original_plan_mask}-\VAR{plan}-BH-\VAR{population_group}.pdf} \par}
+\caption{}
+\label{fig:}
+\end{figure}
+
+\begin{figure}
 {\centering \includegraphics[width=6.5in,height=3.5in]{\VAR{plots_directory}violin-plot-\VAR{chamber}-\VAR{original_plan_mask}-\VAR{plan}-NW-\VAR{population_group}.pdf} \par}
+\caption{}
+\label{fig:}
+\end{figure}
 \BLOCK{ endfor }
 
 \BLOCK{ for population_group in population_groups }
-\begin{figure*}[h]
+\begin{figure}[h]
 \includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-B-\VAR{population_group}-0.3.pdf}
-\includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-B-\VAR{population_group}-0.4.pdf}
-\end{figure*}
-\begin{figure*}[h]
+\includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-B-\VAR{population_group}-0.4.pdf}\\
 \includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-B-\VAR{population_group}-0.5.pdf}
-\end{figure*}
+\caption{}
+\label{fig:}
+\end{figure}
 
-\begin{figure*}[h]
+\begin{figure}[h]
 \includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-H-\VAR{population_group}-0.5.pdf}
-\includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-H-\VAR{population_group}-0.55.pdf}
-\end{figure*}
-\begin{figure*}[h]
+\includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-H-\VAR{population_group}-0.55.pdf}\\
 \includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-H-\VAR{population_group}-0.6.pdf}
 \includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-H-\VAR{population_group}-0.65.pdf}
-\end{figure*}
+\end{figure}
 
-\begin{figure*}[h]
+\begin{figure}[h]
 \includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-BH-\VAR{population_group}-0.5.pdf}
-\includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-BH-\VAR{population_group}-0.6.pdf}
-\end{figure*}
-\begin{figure*}[h]
+\includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-BH-\VAR{population_group}-0.6.pdf}\\
 \includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-BH-\VAR{population_group}-0.7.pdf}
-\end{figure*}
+\caption{}
+\label{fig:}
+\end{figure}
 
-\begin{figure*}[h]
+\begin{figure}[h]
 \includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-NW-\VAR{population_group}-0.5.pdf}
-\includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-NW-\VAR{population_group}-0.6.pdf}
-\end{figure*}
-\begin{figure*}[h]
+\includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-NW-\VAR{population_group}-0.6.pdf}\\
 \includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-NW-\VAR{population_group}-0.7.pdf}
-\end{figure*}
+\caption{}
+\label{fig:}
+\end{figure}
 \BLOCK{ endfor }
 
 \BLOCK{ if have_vra }
