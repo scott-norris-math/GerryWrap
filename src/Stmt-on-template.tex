@@ -79,6 +79,7 @@
 %% This is a template for generating automatic reports for MUMTX.
 %% << Say more stuff here >>
 %% Here are variables that should be defined (will be referenced as \VAR{variable_name}):
+%%   (** means we need changes)
 %%   plan_name:       chamber+number short-hand (i.e. S2168 for TX Senate plan with this code on TLV website, 
 %%                    or DCN#### for a Dallas City Council plan
 %%   number_plans:    number of plans included in ensemble analysis
@@ -86,8 +87,16 @@
 %%   plots_directory: directory where plots are to be found
 %%   report_directory: directory where low-res plan maps are found
 %%   election:        [PRES/SEN] which election to use for first introduction of violin plots
+%%   chamber**:         [USCD/TXSN/TXHD/DCN]
+%%   original_plan_mask:  ???
+%%   original_plan:   comparison plan?? (i.e. "current plan")
+%%   population_groups**: List of groups [TPOP,VAP,CVAP]
 %%   
-%%   
+%% Variables I need Rob to change in pre-processor
+%%   chamber:     provide as tuple [chamber, pretty_chamber]
+%%   population_groups: provide as list of tuples [population_group, pretty_population_group]
+%%   plan_source: where plans come from (Texas Legislative Council, etc..)
+%%
 
 
 
@@ -99,7 +108,6 @@
 
 \bigskip
 
-%Tuesday, October 12, 2021
 \textbf{\textit{Math For Unbiased Maps TX (MUM\_TX) }}is\textbf{\textit{ }}an interdisciplinary, nonpartisan coalition
 of Texas mathematicians, political scientists and philosophers working to ensure a fair and transparent redistricting
 process. Our research concerns the development and application of ensemble sampling techniques, and in particular their
@@ -110,7 +118,7 @@ indication of gerrymandering.
 
 \bigskip
 
-We have applied our methods to the Congressional maps that have been made available by the Texas Legislative Council. 
+We have applied our methods to the maps for \VAR[chamber[1]] that have been made available by the \VAR[plan_source]. 
 %As of 10/12/21, we have seen a large number of maps posted, culminating in \VAR{plan_name} which is now being considered by the House. 
 We generated a table of two important statistics that are commonly used by political scientists to assess
 partisan gerrymandering: the mean-median score and partisan bias score. \ You can find the table at our webpage:
@@ -126,9 +134,8 @@ partisan gerrymandering: the mean-median score and partisan bias score. \ You ca
 
 \bigskip
 
-% We focus on \VAR{plan_name}, which is the map currently under consideration. 
 We compared the proposed map to an \textit{ensemble} of \VAR{number_plans} randomly-drawn maps. \ \ \ In Figure~\ref{fig:1}, districts are ordered by the number of votes a Democratic
-candidate for US Congress would have received in the 2020 election, had voters used ``straight ticket'' voting. \ On
+candidate for \VAR{chamber[1]} would have received in the 2020 election, had voters used ``straight ticket'' voting. \ On
 average, maps within our ensemble (blue dots) exhibit smoothly increasing vote shares as one moves from
 Republican-leaning to Democratic-leaning districts. \ This smooth increase is the hallmark of an unbiased map. 
 %\ \ But in the proposed map (red dots), the increase is highly disjointed, a clear sign of gerrymandering.
@@ -136,17 +143,17 @@ Republican-leaning to Democratic-leaning districts. \ This smooth increase is th
 \begin{figure}
 \hspace*{-1.5cm}
 \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}seats-voteshares-ensemble-comps-\VAR{chamber}-\VAR{original_plan_mask}-\VAR{plan}-\VAR{election}20.pdf}
-\caption{}
-\label{fig:1}
+\caption{Vote share vectors for proposed plan \VAR{plan} compared with an unbiased ensemble of randomly-generated plans. For each plan, districts are ordered by the number of votes a Democratic candidate would have received in the 2020 election, had voters used ``straight ticket'' voting. Blue ``violins" show the the distribution of vote share values in the ensemble; blue horizontal lines mark the 1\% and 99\% percentile of each ordered statistic. The corresponding values for the proposed plan (red) and a comparison plan (green) are shown.}
+\label{fig:vsv-violin-with-comparison}
 \end{figure}
 
 \bigskip
 
-\begin{figure*}
+\begin{figure}
 {\centering \includegraphics[width=6.5in,height=3.5in]{\VAR{plots_directory}seats-voteshares-ensemble-enacted-\VAR{chamber}-\VAR{plan}-\VAR{election}20.pdf} \par}
-\caption{}
-\label{fig:2}
-\end{figure*}
+\caption{As in Fig. \ref{fig:vsv-violin-with-comparison}, but now indentifying (if applicable) distinct signatures of gerrymandering. A district was identified as ``cracked" if its ordered vote share was below the global median and also below the 1\% percentile of its respective ensemble position (CHECK); ``packed" if its ordered vote share was above the global median and also above the 99\% percentile of its respective ensemble position (CHECK).}
+\label{fig:vsv-violin-with-cracking-packing}
+\end{figure}
 
 In Figure~\ref{fig:2}, we show the same data, but now identify two signatures of gerrymandering: ``cracking'' (where opposition voters are diluted to create safe districts for the majority) and ``packing'' (where these voters are concentrated to dilute their overall voting power).
 
@@ -175,12 +182,12 @@ each were to earn 50\% of the vote. A positive score in either favors Democrats.
 %mean-median score of \textbf{{}--2.2} and a partisan bias of \textbf{2} (when the statewide vote splits 50-50, the
 %Republican Party wins \textbf{18 }seats to the Democratic Party's \textbf{20}).}\textstyleeop{~}
 
-\begin{figure*}
+\begin{figure}
 {\centering  \includegraphics[width=5.8154in,height=3.1311in]{\VAR{plots_directory}mean-median-partisan-bias-ensemble-enacted-\VAR{chamber}-\VAR{plan}-\VAR{election}20.pdf}  \\
  \includegraphics[width=5.6909in,height=4.3752in]{\VAR{plots_directory}partisan-metrics-2D-\VAR{chamber}-\VAR{plan}-\VAR{election}20.pdf} \par}
-\caption{}
-\label{fig:3}
-\end{figure*}
+\caption{(Top) The mean-median (left) and partisan bias (right) scores for the ensemble, illustrated as a histogram. The mean-median score is normalized so that it is equal to the difference in vote share that is required for each party to win a majority of seats in the chamber. The partisan bias score is normalized so that it is equal to the difference in seats that each party wins if it wins 50\% of the vote. The corresponding values for the proposed plan (purple) and a comparison plan (green) are also shown. (Bottom) The same data, displayed as a 2D histogram (EXPLAIN SMOOTHING HERE). The proposed plan is shown in red.}
+\label{fig:mm-and-pb-1d-and-2d-histograms}
+\end{figure}
 
 
 \bigskip
@@ -190,15 +197,15 @@ Of course, no plan is going to be perfectly aligned with the ensemble, so just h
 little? \ A lot? \ An extreme amount? \ This question can be answered using statistics, by comparing each score above
 to the \textit{distribution }of those scores within the \VAR{number_plans} - map ensemble. \ This is done in Figure~\ref{fig:3}.  The second row shows the joint distribution of mean-median and partisan bias. 
 
-\begin{figure*}
+\begin{figure}
 {\centering \includegraphics[width=6.5in,height=3.5in]{\VAR{plots_directory}violin-plot-\VAR{chamber}-\VAR{original_plan_mask}-\VAR{plan}-BH-VAP.pdf} \par}
-\caption{}
-\label{fig:4}
-\end{figure*}
+\caption{Minority population percentage vectors for the proposed plan \VAR{plan} compared with an unbiased ensemble of randomly-generated plans. For each plan, districts are ordered by the percentage of the voting age population that is Black or Hispanic. Green ``violins" show the the distribution of percentages in the ensemble; blue horizontal lines mark the 1\% and 99\% percentile of each ordered statistic. The corresponding values for the proposed plan (red) and a comparison plan (green) are shown.}}
+\label{fig:bhvap-violins-with-comparison}
+\end{figure}
 
 \bigskip
 
-In Figure~\ref{fig:4} we present another ``violin'' plot, but with districts sorted according to the
+In Figure~\ref{fig:bhvap-violins-with-comparison} we present another ``violin'' plot, but with districts sorted according to the
 the fraction of the voting age population that is Black + Hispanic. 
 
 %This is vividly illustrated by the 2D histogram showing the joint distribution of these scores across the ensemble (the
@@ -224,10 +231,10 @@ the fraction of the voting age population that is Black + Hispanic.
 
 We next ask the question ``How many Districts have an BHVAP over 50\%?'' (or 60\%, or 70\%, etc..). The
 BHVAP is the combined Black and Hispanic voting age population. These histograms show the values for the ensemble, and
-the value for the Proposed map is shown in red. In Figure~\ref{fig:5} we show the number of districts that have BHVAP above 50\% and 70\%; that is the number of districts that are majority-minority, vs. the number of Districts that are
+the value for the Proposed map is shown in red. In Figure~\ref{fig:num-dists-bhvap-perc} we show the number of districts that have BHVAP above 50\% and 70\%; that is the number of districts that are majority-minority, vs. the number of Districts that are
 \textbf{\textit{overwhelmingly}} majority-minority. 
 
-\begin{figure*}
+\begin{figure}
 \begin{flushleft}
 \tablefirsthead{}
 \tablehead{}
@@ -239,9 +246,9 @@ the value for the Proposed map is shown in red. In Figure~\ref{fig:5} we show th
 \selectlanguage{english}  \includegraphics[width=3.2902in,height=2.1945in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-BH-VAP-0.7.pdf} \\\hline
 \end{supertabular}
 \end{flushleft}
-\caption{}
-\label{fig:5}
-\end{figure*}
+\caption{Number of districts that have a percentage of minority voting age population (specifically, Black and Hispanic) exceeding 50\% (left) and 70\% (right). An excessive number of heavily minority districts is a signature of vote dilution, because it reduces the overall voting strength of the minority group. }
+\label{fig:num-dists-bhvap-perc}
+\end{figure}
 \maxdeadcycles=1000
 \extrafloats{100}
 
@@ -281,79 +288,79 @@ the value for the Proposed map is shown in red. In Figure~\ref{fig:5} we show th
 {\centering \includegraphics[width=7.3307in,height=3.5in]{\VAR{plots_directory}seats-voteshares-ensemble-comps-\VAR{chamber}-\VAR{original_plan_mask}-\VAR{plan}-PRES20.pdf} \par}
 {\centering \includegraphics[width=7.3307in,height=3.5in]{\VAR{plots_directory}seats-voteshares-ensemble-comps-\VAR{chamber}-\VAR{original_plan_mask}-\VAR{plan}-SEN20.pdf} \par}
 \caption{Vote-share vectors for all districts, ordered by increasing Democratic vote share, for the 2020 Presidential (top) and US Senate (bottom) elections. Along with the ensemble (blue violins), vote-share vectors for the proposed (red) and current (green) plans are shown.}
-\label{fig:voteshares_ensem_comps}
+\label{fig:voteshares-ensem-comps}
 \end{figure}
 
 \begin{figure}
 {\centering \includegraphics[width=6.5in,height=3.5in]{\VAR{plots_directory}seats-voteshares-ensemble-enacted-\VAR{chamber}-\VAR{plan}-PRES20.pdf} \par}
-\caption{}
+\caption{Vote-share vectors for all districts, ordered by increasing Democratic vote share, for the 2020 Presidential election. Along with the ensemble (blue violins), vote-share vectors for the proposed (red) plan is shown. (DELETE? IS THIS A REPEAT OF PREVIOUS FIG)}
 \label{fig:seats-voteshares-ensemble-enacted-PRES20}
 \end{figure}
 
 \begin{figure}
 {\centering \includegraphics[width=5.8154in,height=3.1311in]{\VAR{plots_directory}mean-median-partisan-bias-ensemble-enacted-\VAR{chamber}-\VAR{plan}-PRES20.pdf} \par}
-\caption{}
+\caption{The mean-median (left) and partisan bias (right) scores for the ensemble, illustrated as a histogram, using vote shares from the 2020 Presidential election. The mean-median score is normalized so that it is equal to the difference in vote share that is required for each party to win a majority of seats in the chamber. The partisan bias score is normalized so that it is equal to the difference in seats that each party wins if it wins 50\% of the vote. The corresponding values for the proposed plan (purple) and a comparison plan (green) are also shown. }
 \label{fig:mean-median-partisan-bias-ensemble-enacted-PRES20}
 \end{figure}
 
 \begin{figure}
 {\centering \includegraphics[width=4.6909in,height=3.3752in]{\VAR{plots_directory}partisan-metrics-2D-\VAR{chamber}-\VAR{plan}-PRES20.pdf} \par}
-\caption{}
+\caption{The mean-median and partisan bias scores for the ensemble, displayed as a 2D histogram, using vote shares from the 2020 Presidential election. The proposed plan is shown in red.}
 \label{fig:partisan-metrics-2D-PRES20}
 \end{figure}
 
 \begin{figure}
 {\centering \includegraphics[width=6.5in,height=3.5in]{\VAR{plots_directory}seats-voteshares-ensemble-enacted-\VAR{chamber}-\VAR{plan}-SEN20.pdf} \par}
-\caption{}
+\caption{Vote-share vectors for all districts, ordered by increasing Democratic vote share, for the 2020 US Senate election. Along with the ensemble (blue violins), vote-share vectors for the proposed (red) plan is shown.}
 \label{fig:seats-voteshares-ensemble-enacted-SEN20}
 \end{figure}
 
 \begin{figure}
 {\centering \includegraphics[width=5.8154in,height=3.1311in]{\VAR{plots_directory}mean-median-partisan-bias-ensemble-enacted-\VAR{chamber}-\VAR{plan}-SEN20.pdf} \par}
-\caption{}
-\label{fig:}mean-median-partisan-bias-ensemble-enacted-SEN20
+\caption{The mean-median (left) and partisan bias (right) scores for the ensemble, illustrated as a histogram, using vote shares from the 2020 US Senate election. The mean-median score is normalized so that it is equal to the difference in vote share that is required for each party to win a majority of seats in the chamber. The partisan bias score is normalized so that it is equal to the difference in seats that each party wins if it wins 50\% of the vote. The corresponding values for the proposed plan (purple) and a comparison plan (green) are also shown. }
+\label{fig:mean-median-partisan-bias-ensemble-enacted-SEN20}
 \end{figure}
 
 \begin{figure}
 {\centering \includegraphics[width=4.6909in,height=3.3752in]{\VAR{plots_directory}partisan-metrics-2D-\VAR{chamber}-\VAR{plan}-SEN20.pdf} \par}
-\caption{}
+\caption{The mean-median and partisan bias scores for the ensemble, displayed as a 2D histogram, using vote shares from the 2020 US Senate election. The proposed plan is shown in red.}
 \label{fig:partisan-metrics-2D-SEN20}
 \end{figure}
 
-\BLOCK{ for population_group in population_groups }
+\BLOCK{ for [population_group,pretty_population_group] in population_groups }
 
 \begin{figure}
 {\centering \includegraphics[width=6.5in,height=3.5in]{\VAR{plots_directory}violin-plot-\VAR{chamber}-\VAR{original_plan_mask}-\VAR{plan}-B-\VAR{population_group}.pdf} \par}
-\caption{}
-\label{fig:}
+\caption{Black population percentage vectors for the proposed plan \VAR{plan} compared with an unbiased ensemble of randomly-generated plans. For each plan, districts are ordered by the percentage of the \VAR[pretty_population_group] that is Black. Orange ``violins" show the the distribution of percentages in the ensemble; blue horizontal lines mark the 1\% and 99\% percentile of each ordered statistic. The corresponding values for the proposed plan (red) and a comparison plan (green) are shown.}
+\label{fig:violin-plot-B-\VAR{population_group}}
 \end{figure}
 
 \begin{figure}
 {\centering \includegraphics[width=6.5in,height=3.5in]{\VAR{plots_directory}violin-plot-\VAR{chamber}-\VAR{original_plan_mask}-\VAR{plan}-H-\VAR{population_group}.pdf} \par}
-\caption{}
-\label{fig:}
+\caption{Hispanic population percentage vectors for the proposed plan \VAR{plan} compared with an unbiased ensemble of randomly-generated plans. For each plan, districts are ordered by the percentage of the \VAR[pretty_population_group] that is Hispanic. Violet ``violins" show the the distribution of percentages in the ensemble; blue horizontal lines mark the 1\% and 99\% percentile of each ordered statistic. The corresponding values for the proposed plan (red) and a comparison plan (green) are shown.}
+\label{fig:violin-plot-H-\VAR{population_group}}
 \end{figure}
 
 \begin{figure}
 {\centering \includegraphics[width=6.5in,height=3.5in]{\VAR{plots_directory}violin-plot-\VAR{chamber}-\VAR{original_plan_mask}-\VAR{plan}-BH-\VAR{population_group}.pdf} \par}
-\caption{}
-\label{fig:}
+\caption{Minority population percentage vectors for the proposed plan \VAR{plan} compared with an unbiased ensemble of randomly-generated plans. For each plan, districts are ordered by the percentage of the \VAR[pretty_population_group] that is Black or Hispanic. Green ``violins" show the the distribution of percentages in the ensemble; blue horizontal lines mark the 1\% and 99\% percentile of each ordered statistic. The corresponding values for the proposed plan (red) and a comparison plan (green) are shown.}
+\label{fig:violin-plot-BH-\VAR{population_group}}
 \end{figure}
 
 \begin{figure}
 {\centering \includegraphics[width=6.5in,height=3.5in]{\VAR{plots_directory}violin-plot-\VAR{chamber}-\VAR{original_plan_mask}-\VAR{plan}-NW-\VAR{population_group}.pdf} \par}
-\caption{}
-\label{fig:}
+\caption{Non-white population percentage vectors for the proposed plan \VAR{plan} compared with an unbiased ensemble of randomly-generated plans. For each plan, districts are ordered by the percentage of the \VAR[pretty_population_group] that is non-white. Orange ``violins" show the the distribution of percentages in the ensemble; blue horizontal lines mark the 1\% and 99\% percentile of each ordered statistic. The corresponding values for the proposed plan (red) and a comparison plan (green) are shown.}
+\label{fig:violin-plot-NW-\VAR{population_group}}
 \end{figure}
 \BLOCK{ endfor }
 
-\BLOCK{ for population_group in population_groups }
+\BLOCK{ for [population_group,pretty_population_group] in population_groups }
 \begin{figure}[h]
 \includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-B-\VAR{population_group}-0.3.pdf}
 \includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-B-\VAR{population_group}-0.4.pdf}\\
 \includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-B-\VAR{population_group}-0.5.pdf}
-\caption{}
-\label{fig:}
+\caption{Number of districts that have a percentage of the Black \VAR{pretty_population_group} exceeding 30\% (top left), 40\% (top right), and 50\% (bottom). The histogram shows values for the ensemble; the corresponding values for the proposed plan (red) and a comparison plan (green) are also shown.}
+\label{fig:hist-small-B-\VAR{population_group}}
 \end{figure}
 
 \begin{figure}[h]
@@ -361,22 +368,24 @@ the value for the Proposed map is shown in red. In Figure~\ref{fig:5} we show th
 \includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-H-\VAR{population_group}-0.55.pdf}\\
 \includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-H-\VAR{population_group}-0.6.pdf}
 \includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-H-\VAR{population_group}-0.65.pdf}
+\caption{Number of districts that have a percentage of the Hispanic \VAR{pretty_population_group} exceeding 50\% (top left), 55\% (top right), 60\% (bottom left), and 65\% (bottom right). The histogram shows values for the ensemble; the corresponding values for the proposed plan (red) and a comparison plan (green) are also shown.}
+\label{fig:hist-small-H-\VAR{population_group}}
 \end{figure}
 
 \begin{figure}[h]
 \includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-BH-\VAR{population_group}-0.5.pdf}
 \includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-BH-\VAR{population_group}-0.6.pdf}\\
 \includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-BH-\VAR{population_group}-0.7.pdf}
-\caption{}
-\label{fig:}
+\caption{Number of districts that have a percentage of the Black or Hispanic \VAR{pretty_population_group} exceeding 50\% (top left), 60\% (top right), and 70\% (bottom). The histogram shows values for the ensemble; the corresponding values for the proposed plan (red) and a comparison plan (green) are also shown.}
+\label{fig:hist-small-BH-\VAR{population_group}}
 \end{figure}
 
 \begin{figure}[h]
 \includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-NW-\VAR{population_group}-0.5.pdf}
 \includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-NW-\VAR{population_group}-0.6.pdf}\\
 \includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-NW-\VAR{population_group}-0.7.pdf}
-\caption{}
-\label{fig:}
+\caption{Number of districts that have a percentage of the non-white \VAR{pretty_population_group} exceeding 50\% (top left), 60\% (top right), and 70\% (bottom). The histogram shows values for the ensemble; the corresponding values for the proposed plan (red) and a comparison plan (green) are also shown.}
+\label{fig:hist-small-NW-\VAR{population_group}}
 \end{figure}
 \BLOCK{ endfor }
 
@@ -388,7 +397,7 @@ the value for the Proposed map is shown in red. In Figure~\ref{fig:5} we show th
 \BLOCK{ for racial_group in ['BA', 'B', 'HA', 'H', 'BHO', 'BH'] }
 \begin{figure}[h]
 \includegraphics[width=6.5in,height=3.5in]{\VAR{plots_directory}violin-plot-\VAR{chamber}-\VAR{original_plan_mask}-\VAR{plan}-\VAR{racial_group}-CVAP-mggg_eff_\VAR{model}.pdf}
-\caption{}
+\caption{Come back to this later: need a report with these pics}
 \label{fig:}
 \end{figure}
 
@@ -420,19 +429,22 @@ the value for the Proposed map is shown in red. In Figure~\ref{fig:5} we show th
 \BLOCK{ endfor }
 \BLOCK{ endif }  %% IF using VRA metrics from MGGG
 
-\BLOCK{ for population_group in population_groups }
+\BLOCK{ for [population_group,pretty_population_group] in population_groups }
 \begin{figure}[h]{\centering \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}racial-political-deviations-with-ensemble-\VAR{chamber}-\VAR{plan}-PRES20-B-\VAR{population_group}.pdf} \par}
 \caption{}
 \label{fig:}
 \end{figure}
+
 \begin{figure}[h]{\centering \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}racial-political-deviations-with-ensemble-\VAR{chamber}-\VAR{plan}-PRES20-H-\VAR{population_group}.pdf} \par}
 \caption{}
 \label{fig:}
 \end{figure}
+
 \begin{figure}[h]{\centering \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}racial-political-deviations-with-ensemble-\VAR{chamber}-\VAR{plan}-PRES20-BH-\VAR{population_group}.pdf} \par}
 \caption{}
 \label{fig:}
 \end{figure}
+
 \begin{figure}[h]{\centering \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}racial-political-deviations-with-ensemble-\VAR{chamber}-\VAR{plan}-PRES20-NW-\VAR{population_group}.pdf} \par}
 \caption{}
 \label{fig:}
