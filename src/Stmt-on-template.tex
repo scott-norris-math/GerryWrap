@@ -431,42 +431,51 @@ the value for the Proposed map is shown in red. In Figure~\ref{fig:num-dists-bhv
 
 \BLOCK{ for [population_group,pretty_population_group] in population_groups }
 \begin{figure}[h]{\centering \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}racial-political-deviations-with-ensemble-\VAR{chamber}-\VAR{plan}-PRES20-B-\VAR{population_group}.pdf} \par}
-\caption{}
-\label{fig:}
+\caption{Correlation between Democratic vote share and Black \VAR{pretty_population_group}, illustrated as deviations from the jurisdiction-wide means. For example: suppose the jurisdiction-wide (i.e. statewide or citywide) Democratic vote share is 60\%, and the jurisdiction-wide Black share of \VAR{pretty_population_group} is 35\%. Then a district with 52\% Democratic vote share and 36% Black \VAR{pretty_population_group} will have Democratic Voter Deviation 0.52-0.6 = -0.08 and Minority Population Deviation of 0.36-0.35 = +0.01. Democratic vote shares are from the 2020 Presidential election. Values for districts in the ensemble are shown as a 2D histogram; values for the proposed plan are superimposed and are colored by whether they show signatures of gerrymandering: cracked (yellow), packed (orange), stuffed (purple), or unclassified (red). }
+\label{fig:rpd-with-ens-PRES20-B-\VAR{population_group}}
 \end{figure}
 
 \begin{figure}[h]{\centering \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}racial-political-deviations-with-ensemble-\VAR{chamber}-\VAR{plan}-PRES20-H-\VAR{population_group}.pdf} \par}
-\caption{}
-\label{fig:}
+\caption{Correlation between Democratic vote share and Hispanic\VAR{pretty_population_group}, illustrated as deviations from the jurisdiction-wide means
+(see Fig. \ref{fig:rpd-with-ens-PRES20-B-\VAR{population_group}} for an explanation of how this is defined). Democratic vote shares are from the 2020 Presidential election.  Values for districts in the ensemble are shown as a 2D histogram; values for the proposed plan are superimposed and are colored by whether they show signatures of partisan gerrymandering: cracked (yellow), packed (orange), stuffed (purple), or unclassified (red). }
+\label{fig:rpd-with-ens-PRES20-H-\VAR{population_group}}
 \end{figure}
 
 \begin{figure}[h]{\centering \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}racial-political-deviations-with-ensemble-\VAR{chamber}-\VAR{plan}-PRES20-BH-\VAR{population_group}.pdf} \par}
-\caption{}
-\label{fig:}
+\caption{Correlation between Democratic vote share and Black and Hispanic \VAR{pretty_population_group}, illustrated as deviations from the jurisdiction-wide means
+(see Fig. \ref{fig:rpd-with-ens-PRES20-B-\VAR{population_group}} for an explanation of how this is defined). Democratic vote shares are from the 2020 Presidential election.  Values for districts in the ensemble are shown as a 2D histogram; values for the proposed plan are superimposed and are colored by whether they show signatures of partisan gerrymandering: cracked (yellow), packed (orange), stuffed (purple), or unclassified (red). }
+\label{fig:rpd-with-ens-PRES20-BH-\VAR{population_group}}
 \end{figure}
 
 \begin{figure}[h]{\centering \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}racial-political-deviations-with-ensemble-\VAR{chamber}-\VAR{plan}-PRES20-NW-\VAR{population_group}.pdf} \par}
-\caption{}
-\label{fig:}
+\caption{Correlation between Democratic vote share and non-white \VAR{pretty_population_group}, illustrated as deviations from the jurisdiction-wide means
+(see Fig. \ref{fig:rpd-with-ens-PRES20-B-\VAR{population_group}} for an explanation of how this is defined). Democratic vote shares are from the 2020 Presidential election.  Values for districts in the ensemble are shown as a 2D histogram; values for the proposed plan are superimposed and are colored by whether they show signatures of partisan gerrymandering: cracked (yellow), packed (orange), stuffed (purple), or unclassified (red). }
+\label{fig:rpd-with-ens-PRES20-NW-\VAR{population_group}}
 \end{figure}
 \BLOCK{ endfor }
 
-\BLOCK{ for population_group in population_groups }
+\BLOCK{ for [population_group,pretty_population_group] in population_groups }
 \begin{figure}[h]{\centering \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}racial-political-deviations-with-ensemble-\VAR{chamber}-\VAR{plan}-SEN20-B-\VAR{population_group}.pdf} \par}
-\caption{}
-\label{fig:}
+\caption{Correlation between Democratic vote share and Black \VAR{pretty_population_group}, illustrated as deviations from the jurisdiction-wide means. For example: suppose the jurisdiction-wide (i.e. statewide or citywide) Democratic vote share is 60\%, and the jurisdiction-wide Black share of \VAR{pretty_population_group} is 35\%. Then a district with 52\% Democratic vote share and 36% Black \VAR{pretty_population_group} will have Democratic Voter Deviation 0.52-0.6 = -0.08 and Minority Population Deviation of 0.36-0.35 = +0.01. Democratic vote shares are from the 2020 US Senate election. Values for districts in the ensemble are shown as a 2D histogram; values for the proposed plan are superimposed and are colored by whether they show signatures of gerrymandering: cracked (yellow), packed (orange), stuffed (purple), or unclassified (red). }
+\label{fig:rpd-with-ens-SEN20-B-\VAR{population_group}}
 \end{figure}
+
 \begin{figure}[h]{\centering \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}racial-political-deviations-with-ensemble-\VAR{chamber}-\VAR{plan}-SEN20-H-\VAR{population_group}.pdf} \par}
-\caption{}
-\label{fig:}
+\caption{Correlation between Democratic vote share and Hispanic \VAR{pretty_population_group}, illustrated as deviations from the jurisdiction-wide means
+(see Fig. \ref{fig:rpd-with-ens-SEN20-B-\VAR{population_group}} for an explanation of how this is defined). Democratic vote shares are from the 2020 US Senate election.  Values for districts in the ensemble are shown as a 2D histogram; values for the proposed plan are superimposed and are colored by whether they show signatures of partisan gerrymandering: cracked (yellow), packed (orange), stuffed (purple), or unclassified (red).}
+\label{fig:rpd-with-ens-SEN20-H-\VAR{population_group}}
 \end{figure}
+
 \begin{figure}[h]{\centering \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}racial-political-deviations-with-ensemble-\VAR{chamber}-\VAR{plan}-SEN20-BH-\VAR{population_group}.pdf} \par}
-\caption{}
-\label{fig:}
+\caption{Correlation between Democratic vote share and the Black and Hispanic \VAR{pretty_population_group}, illustrated as deviations from the jurisdiction-wide means
+(see Fig. \ref{fig:rpd-with-ens-SEN20-B-\VAR{population_group}} for an explanation of how this is defined). Democratic vote shares are from the 2020 US Senate election.  Values for districts in the ensemble are shown as a 2D histogram; values for the proposed plan are superimposed and are colored by whether they show signatures of partisan gerrymandering: cracked (yellow), packed (orange), stuffed (purple), or unclassified (red).}
+\label{fig:rpd-with-ens-SEN20-BH-\VAR{population_group}}
 \end{figure}
+
 \begin{figure}[h]{\centering \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}racial-political-deviations-with-ensemble-\VAR{chamber}-\VAR{plan}-SEN20-NW-\VAR{population_group}.pdf} \par}
-\caption{}
-\label{fig:}
+\caption{Correlation between Democratic vote share and non-white \VAR{pretty_population_group}, illustrated as deviations from the jurisdiction-wide means
+(see Fig. \ref{fig:rpd-with-ens-SEN20-B-\VAR{population_group}} for an explanation of how this is defined). Democratic vote shares are from the 2020 US Senate election.  Values for districts in the ensemble are shown as a 2D histogram; values for the proposed plan are superimposed and are colored by whether they show signatures of partisan gerrymandering: cracked (yellow), packed (orange), stuffed (purple), or unclassified (red).}
+\label{fig:rpd-with-ens-SEN20-NW-\VAR{population_group}}
 \end{figure}
 \BLOCK{ endfor }
 
