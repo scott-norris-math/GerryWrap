@@ -76,6 +76,20 @@
 \renewcommand\labelitemiv{[F0B7?]}
 }
 
+%% This is a template for generating automatic reports for MUMTX.
+%% << Say more stuff here >>
+%% Here are variables that should be defined (will be referenced as \VAR{variable_name}):
+%%   plan_name:       chamber+number short-hand (i.e. S2168 for TX Senate plan with this code on TLV website, 
+%%                    or DCN#### for a Dallas City Council plan
+%%   number_plans:    number of plans included in ensemble analysis
+%%   
+%%   plots_directory: directory where plots are to be found
+%%   report_directory: directory where low-res plan maps are found
+%%   election:        [PRES/SEN] which election to use for first introduction of violin plots
+%%   
+%%   
+
+
 
 \title{}
 \author{Barreiro, Andrea}
@@ -119,12 +133,12 @@ average, maps within our ensemble (blue dots) exhibit smoothly increasing vote s
 Republican-leaning to Democratic-leaning districts. \ This smooth increase is the hallmark of an unbiased map. 
 %\ \ But in the proposed map (red dots), the increase is highly disjointed, a clear sign of gerrymandering.
 
-\begin{figure*}
+\begin{figure}
 \hspace*{-1.5cm}
 \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}seats-voteshares-ensemble-comps-\VAR{chamber}-\VAR{original_plan_mask}-\VAR{plan}-\VAR{election}20.pdf}
 \caption{}
 \label{fig:1}
-\end{figure*}
+\end{figure}
 
 \bigskip
 
