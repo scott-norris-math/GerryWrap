@@ -366,44 +366,82 @@ the value for the Proposed map is shown in red. In Figure~\ref{fig:5} we show th
 \end{figure}
 \BLOCK{ endfor }
 
+%% VRA Metrics from MGGG
 \BLOCK{ if have_vra }
 \section*{VRA}
 
 \BLOCK{ for model in ['equal', 'state'] }
 \BLOCK{ for racial_group in ['BA', 'B', 'HA', 'H', 'BHO', 'BH'] }
-{\centering \includegraphics[width=6.5in,height=3.5in]{\VAR{plots_directory}violin-plot-\VAR{chamber}-\VAR{original_plan_mask}-\VAR{plan}-\VAR{racial_group}-CVAP-mggg_eff_\VAR{model}.pdf} \par}
+\begin{figure}[h]
+\includegraphics[width=6.5in,height=3.5in]{\VAR{plots_directory}violin-plot-\VAR{chamber}-\VAR{original_plan_mask}-\VAR{plan}-\VAR{racial_group}-CVAP-mggg_eff_\VAR{model}.pdf}
+\caption{}
+\label{fig:}
+\end{figure}
+
 \BLOCK{ endfor }
 \BLOCK{ endfor }
 
 \BLOCK{ for model in ['equal', 'state'] }
 \BLOCK{ for racial_group in ['BA', 'B', 'HA', 'H', 'BHO', 'BH'] }
-\begin{figure*}[h]
+\begin{figure}[h]
 \includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-\VAR{racial_group}-CVAP-mggg_eff_\VAR{model}-0.3.pdf}
 \includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-\VAR{racial_group}-CVAP-mggg_eff_\VAR{model}-0.4.pdf}
-\end{figure*}
-\begin{figure*}[h]
+\caption{}
+\label{fig:}
+\end{figure}
+
+\begin{figure}[h]
 \includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-\VAR{racial_group}-CVAP-mggg_eff_\VAR{model}-0.5.pdf}
 \includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-\VAR{racial_group}-CVAP-mggg_eff_\VAR{model}-0.6.pdf}
-\end{figure*}
-\begin{figure*}[h]
+\caption{}
+\label{fig:}
+\end{figure}
+
+\begin{figure}[h]
 \includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-\VAR{racial_group}-CVAP-mggg_eff_\VAR{model}-0.7.pdf}
-\end{figure*}
+\caption{}
+\label{fig:}
+\end{figure}
 \BLOCK{ endfor }
 \BLOCK{ endfor }
-\BLOCK{ endif }
+\BLOCK{ endif }  %% IF using VRA metrics from MGGG
 
 \BLOCK{ for population_group in population_groups }
-\begin{figure*}[h]{\centering \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}racial-political-deviations-with-ensemble-\VAR{chamber}-\VAR{plan}-PRES20-B-\VAR{population_group}.pdf} \par}\end{figure*}
-\begin{figure*}[h]{\centering \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}racial-political-deviations-with-ensemble-\VAR{chamber}-\VAR{plan}-PRES20-H-\VAR{population_group}.pdf} \par}\end{figure*}
-\begin{figure*}[h]{\centering \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}racial-political-deviations-with-ensemble-\VAR{chamber}-\VAR{plan}-PRES20-BH-\VAR{population_group}.pdf} \par}\end{figure*}
-\begin{figure*}[h]{\centering \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}racial-political-deviations-with-ensemble-\VAR{chamber}-\VAR{plan}-PRES20-NW-\VAR{population_group}.pdf} \par}\end{figure*}
+\begin{figure}[h]{\centering \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}racial-political-deviations-with-ensemble-\VAR{chamber}-\VAR{plan}-PRES20-B-\VAR{population_group}.pdf} \par}
+\caption{}
+\label{fig:}
+\end{figure}
+\begin{figure}[h]{\centering \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}racial-political-deviations-with-ensemble-\VAR{chamber}-\VAR{plan}-PRES20-H-\VAR{population_group}.pdf} \par}
+\caption{}
+\label{fig:}
+\end{figure}
+\begin{figure}[h]{\centering \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}racial-political-deviations-with-ensemble-\VAR{chamber}-\VAR{plan}-PRES20-BH-\VAR{population_group}.pdf} \par}
+\caption{}
+\label{fig:}
+\end{figure}
+\begin{figure}[h]{\centering \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}racial-political-deviations-with-ensemble-\VAR{chamber}-\VAR{plan}-PRES20-NW-\VAR{population_group}.pdf} \par}
+\caption{}
+\label{fig:}
+\end{figure}
 \BLOCK{ endfor }
 
 \BLOCK{ for population_group in population_groups }
-\begin{figure*}[h]{\centering \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}racial-political-deviations-with-ensemble-\VAR{chamber}-\VAR{plan}-SEN20-B-\VAR{population_group}.pdf} \par}\end{figure*}
-\begin{figure*}[h]{\centering \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}racial-political-deviations-with-ensemble-\VAR{chamber}-\VAR{plan}-SEN20-H-\VAR{population_group}.pdf} \par}\end{figure*}
-\begin{figure*}[h]{\centering \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}racial-political-deviations-with-ensemble-\VAR{chamber}-\VAR{plan}-SEN20-BH-\VAR{population_group}.pdf} \par}\end{figure*}
-\begin{figure*}[h]{\centering \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}racial-political-deviations-with-ensemble-\VAR{chamber}-\VAR{plan}-SEN20-NW-\VAR{population_group}.pdf} \par}\end{figure*}
+\begin{figure}[h]{\centering \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}racial-political-deviations-with-ensemble-\VAR{chamber}-\VAR{plan}-SEN20-B-\VAR{population_group}.pdf} \par}
+\caption{}
+\label{fig:}
+\end{figure}
+\begin{figure}[h]{\centering \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}racial-political-deviations-with-ensemble-\VAR{chamber}-\VAR{plan}-SEN20-H-\VAR{population_group}.pdf} \par}
+\caption{}
+\label{fig:}
+\end{figure}
+\begin{figure}[h]{\centering \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}racial-political-deviations-with-ensemble-\VAR{chamber}-\VAR{plan}-SEN20-BH-\VAR{population_group}.pdf} \par}
+\caption{}
+\label{fig:}
+\end{figure}
+\begin{figure}[h]{\centering \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}racial-political-deviations-with-ensemble-\VAR{chamber}-\VAR{plan}-SEN20-NW-\VAR{population_group}.pdf} \par}
+\caption{}
+\label{fig:}
+\end{figure}
 \BLOCK{ endfor }
 
 \end{document}
