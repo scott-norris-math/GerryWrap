@@ -76,27 +76,24 @@
 \renewcommand\labelitemiv{[F0B7?]}
 }
 
-%% This is a template for generating automatic reports for MUMTX.
-%% << Say more stuff here >>
-%% Here are variables that should be defined (will be referenced as \VAR{variable_name}):
-%%   (** means we need changes)
-%%   plan_name:       chamber+number short-hand (i.e. S2168 for TX Senate plan with this code on TLV website, 
-%%                    or DCN#### for a Dallas City Council plan
-%%   number_plans:    number of plans included in ensemble analysis
-%%   
-%%   plots_directory: directory where plots are to be found
-%%   report_directory: directory where low-res plan maps are found
-%%   election:        [PRES/SEN] which election to use for first introduction of violin plots
-%%   chamber**:         [USCD/TXSN/TXHD/DCN]
-%%   original_plan_mask:  ???
-%%   original_plan:   comparison plan?? (i.e. "current plan")
-%%   population_groups**: List of groups [TPOP,VAP,CVAP]
-%%   
-%% Variables I need Rob to change in pre-processor
-%%   chamber:     provide as tuple [chamber, pretty_chamber]
-%%   population_groups: provide as list of tuples [population_group, pretty_population_group]
-%%   plan_source: where plans come from (Texas Legislative Council, etc..)
-%%
+% This is a template for generating automatic reports for MUMTX.
+% << Say more stuff here >>
+% Here are variables that should be defined (will be referenced as \VAR{variable_name}):
+%   (** means we need changes)
+%   plan_name:       chamber+number short-hand (i.e. S2168 for TX Senate plan with this code on TLV website, 
+%                    or DCN#### for a Dallas City Council plan
+%   number_plans:    number of plans included in ensemble analysis
+%   
+%   plots_directory: directory where plots are to be found
+%   report_directory: directory where low-res plan maps are found
+%   election:        [PRES/SEN] which election to use for first introduction of violin plots
+%   chamber**:         [USCD/TXSN/TXHD/DCN]
+%   pretty_chamber:  
+%   original_plan_mask:  ???
+%   original_plan:   comparison plan?? (i.e. "current plan")
+%   population_groups**: List of tuples (population_group, pretty_population_group) [TPOP,VAP,CVAP]
+%   chamber:     provide as tuple [chamber, pretty_chamber]
+%   plan_source: where plans come from (Texas Legislative Council, etc..)
 
 
 
@@ -118,7 +115,7 @@ indication of gerrymandering.
 
 \bigskip
 
-We have applied our methods to the maps for \VAR[chamber[1]] that have been made available by the \VAR[plan_source]. 
+We have applied our methods to the maps for \VAR{pretty_chamber} that have been made available by the \VAR{plan_source}. 
 %As of 10/12/21, we have seen a large number of maps posted, culminating in \VAR{plan_name} which is now being considered by the House. 
 We generated a table of two important statistics that are commonly used by political scientists to assess
 partisan gerrymandering: the mean-median score and partisan bias score. \ You can find the table at our webpage:
@@ -135,7 +132,7 @@ partisan gerrymandering: the mean-median score and partisan bias score. \ You ca
 \bigskip
 
 We compared the proposed map to an \textit{ensemble} of \VAR{number_plans} randomly-drawn maps. \ \ \ In Figure~\ref{fig:1}, districts are ordered by the number of votes a Democratic
-candidate for \VAR{chamber[1]} would have received in the 2020 election, had voters used ``straight ticket'' voting. \ On
+candidate for \VAR{pretty_chamber} would have received in the 2020 election, had voters used ``straight ticket'' voting. \ On
 average, maps within our ensemble (blue dots) exhibit smoothly increasing vote shares as one moves from
 Republican-leaning to Democratic-leaning districts. \ This smooth increase is the hallmark of an unbiased map. 
 %\ \ But in the proposed map (red dots), the increase is highly disjointed, a clear sign of gerrymandering.
@@ -151,7 +148,7 @@ Republican-leaning to Democratic-leaning districts. \ This smooth increase is th
 
 \begin{figure}
 {\centering \includegraphics[width=6.5in,height=3.5in]{\VAR{plots_directory}seats-voteshares-ensemble-enacted-\VAR{chamber}-\VAR{plan}-\VAR{election}20.pdf} \par}
-\caption{As in Fig. \ref{fig:vsv-violin-with-comparison}, but now indentifying (if applicable) distinct signatures of gerrymandering. A district was identified as ``cracked" if its ordered vote share was below the global median and also below the 1\% percentile of its respective ensemble position (CHECK); ``packed" if its ordered vote share was above the global median and also above the 99\% percentile of its respective ensemble position (CHECK).}
+\caption{As in Fig. \ref{fig:vsv-violin-with-comparison}, but now identifying (if applicable) distinct signatures of gerrymandering. A district was identified as ``cracked" if its ordered vote share was below the global median and also below the 1\% percentile of its respective ensemble position (CHECK); ``packed" if its ordered vote share was above the global median and also above the 99\% percentile of its respective ensemble position (CHECK).}
 \label{fig:vsv-violin-with-cracking-packing}
 \end{figure}
 
@@ -199,7 +196,7 @@ to the \textit{distribution }of those scores within the \VAR{number_plans} - map
 
 \begin{figure}
 {\centering \includegraphics[width=6.5in,height=3.5in]{\VAR{plots_directory}violin-plot-\VAR{chamber}-\VAR{original_plan_mask}-\VAR{plan}-BH-VAP.pdf} \par}
-\caption{Minority population percentage vectors for the proposed plan \VAR{plan} compared with an unbiased ensemble of randomly-generated plans. For each plan, districts are ordered by the percentage of the voting age population that is Black or Hispanic. Green ``violins" show the the distribution of percentages in the ensemble; blue horizontal lines mark the 1\% and 99\% percentile of each ordered statistic. The corresponding values for the proposed plan (red) and a comparison plan (green) are shown.}}
+\caption{Minority population percentage vectors for the proposed plan \VAR{plan} compared with an unbiased ensemble of randomly-generated plans. For each plan, districts are ordered by the percentage of the voting age population that is Black or Hispanic. Green ``violins" show the the distribution of percentages in the ensemble; blue horizontal lines mark the 1\% and 99\% percentile of each ordered statistic. The corresponding values for the proposed plan (red) and a comparison plan (green) are shown.}
 \label{fig:bhvap-violins-with-comparison}
 \end{figure}
 
@@ -327,34 +324,34 @@ the value for the Proposed map is shown in red. In Figure~\ref{fig:num-dists-bhv
 \label{fig:partisan-metrics-2D-SEN20}
 \end{figure}
 
-\BLOCK{ for [population_group,pretty_population_group] in population_groups }
+\BLOCK{ for (population_group,pretty_population_group) in population_groups }
 
 \begin{figure}
 {\centering \includegraphics[width=6.5in,height=3.5in]{\VAR{plots_directory}violin-plot-\VAR{chamber}-\VAR{original_plan_mask}-\VAR{plan}-B-\VAR{population_group}.pdf} \par}
-\caption{Black population percentage vectors for the proposed plan \VAR{plan} compared with an unbiased ensemble of randomly-generated plans. For each plan, districts are ordered by the percentage of the \VAR[pretty_population_group] that is Black. Orange ``violins" show the the distribution of percentages in the ensemble; blue horizontal lines mark the 1\% and 99\% percentile of each ordered statistic. The corresponding values for the proposed plan (red) and a comparison plan (green) are shown.}
+\caption{Black population percentage vectors for the proposed plan \VAR{plan} compared with an unbiased ensemble of randomly-generated plans. For each plan, districts are ordered by the percentage of the \VAR{pretty_population_group} that is Black. Orange ``violins" show the the distribution of percentages in the ensemble; blue horizontal lines mark the 1\% and 99\% percentile of each ordered statistic. The corresponding values for the proposed plan (red) and a comparison plan (green) are shown.}
 \label{fig:violin-plot-B-\VAR{population_group}}
 \end{figure}
 
 \begin{figure}
 {\centering \includegraphics[width=6.5in,height=3.5in]{\VAR{plots_directory}violin-plot-\VAR{chamber}-\VAR{original_plan_mask}-\VAR{plan}-H-\VAR{population_group}.pdf} \par}
-\caption{Hispanic population percentage vectors for the proposed plan \VAR{plan} compared with an unbiased ensemble of randomly-generated plans. For each plan, districts are ordered by the percentage of the \VAR[pretty_population_group] that is Hispanic. Violet ``violins" show the the distribution of percentages in the ensemble; blue horizontal lines mark the 1\% and 99\% percentile of each ordered statistic. The corresponding values for the proposed plan (red) and a comparison plan (green) are shown.}
+\caption{Hispanic population percentage vectors for the proposed plan \VAR{plan} compared with an unbiased ensemble of randomly-generated plans. For each plan, districts are ordered by the percentage of the \VAR{pretty_population_group} that is Hispanic. Violet ``violins" show the the distribution of percentages in the ensemble; blue horizontal lines mark the 1\% and 99\% percentile of each ordered statistic. The corresponding values for the proposed plan (red) and a comparison plan (green) are shown.}
 \label{fig:violin-plot-H-\VAR{population_group}}
 \end{figure}
 
 \begin{figure}
 {\centering \includegraphics[width=6.5in,height=3.5in]{\VAR{plots_directory}violin-plot-\VAR{chamber}-\VAR{original_plan_mask}-\VAR{plan}-BH-\VAR{population_group}.pdf} \par}
-\caption{Minority population percentage vectors for the proposed plan \VAR{plan} compared with an unbiased ensemble of randomly-generated plans. For each plan, districts are ordered by the percentage of the \VAR[pretty_population_group] that is Black or Hispanic. Green ``violins" show the the distribution of percentages in the ensemble; blue horizontal lines mark the 1\% and 99\% percentile of each ordered statistic. The corresponding values for the proposed plan (red) and a comparison plan (green) are shown.}
+\caption{Minority population percentage vectors for the proposed plan \VAR{plan} compared with an unbiased ensemble of randomly-generated plans. For each plan, districts are ordered by the percentage of the \VAR{pretty_population_group} that is Black or Hispanic. Green ``violins" show the the distribution of percentages in the ensemble; blue horizontal lines mark the 1\% and 99\% percentile of each ordered statistic. The corresponding values for the proposed plan (red) and a comparison plan (green) are shown.}
 \label{fig:violin-plot-BH-\VAR{population_group}}
 \end{figure}
 
 \begin{figure}
 {\centering \includegraphics[width=6.5in,height=3.5in]{\VAR{plots_directory}violin-plot-\VAR{chamber}-\VAR{original_plan_mask}-\VAR{plan}-NW-\VAR{population_group}.pdf} \par}
-\caption{Non-white population percentage vectors for the proposed plan \VAR{plan} compared with an unbiased ensemble of randomly-generated plans. For each plan, districts are ordered by the percentage of the \VAR[pretty_population_group] that is non-white. Orange ``violins" show the the distribution of percentages in the ensemble; blue horizontal lines mark the 1\% and 99\% percentile of each ordered statistic. The corresponding values for the proposed plan (red) and a comparison plan (green) are shown.}
+\caption{Non-white population percentage vectors for the proposed plan \VAR{plan} compared with an unbiased ensemble of randomly-generated plans. For each plan, districts are ordered by the percentage of the \VAR{pretty_population_group} that is non-white. Orange ``violins" show the the distribution of percentages in the ensemble; blue horizontal lines mark the 1\% and 99\% percentile of each ordered statistic. The corresponding values for the proposed plan (red) and a comparison plan (green) are shown.}
 \label{fig:violin-plot-NW-\VAR{population_group}}
 \end{figure}
 \BLOCK{ endfor }
 
-\BLOCK{ for [population_group,pretty_population_group] in population_groups }
+\BLOCK{ for (population_group,pretty_population_group) in population_groups }
 \begin{figure}[h]
 \includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-B-\VAR{population_group}-0.3.pdf}
 \includegraphics[width=3.111in,height=2.0555in]{\VAR{plots_directory}hist-small-\VAR{chamber}-\VAR{original_plan}-\VAR{plan}-B-\VAR{population_group}-0.4.pdf}\\
@@ -389,7 +386,7 @@ the value for the Proposed map is shown in red. In Figure~\ref{fig:num-dists-bhv
 \end{figure}
 \BLOCK{ endfor }
 
-%% VRA Metrics from MGGG
+% VRA Metrics from MGGG
 \BLOCK{ if have_vra }
 \section*{VRA}
 
@@ -427,11 +424,11 @@ the value for the Proposed map is shown in red. In Figure~\ref{fig:num-dists-bhv
 \end{figure}
 \BLOCK{ endfor }
 \BLOCK{ endfor }
-\BLOCK{ endif }  %% IF using VRA metrics from MGGG
+\BLOCK{ endif }  % IF using VRA metrics from MGGG
 
-\BLOCK{ for [population_group,pretty_population_group] in population_groups }
+\BLOCK{ for (population_group,pretty_population_group) in population_groups }
 \begin{figure}[h]{\centering \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}racial-political-deviations-with-ensemble-\VAR{chamber}-\VAR{plan}-PRES20-B-\VAR{population_group}.pdf} \par}
-\caption{Correlation between Democratic vote share and Black \VAR{pretty_population_group}, illustrated as deviations from the jurisdiction-wide means. For example: suppose the jurisdiction-wide (i.e. statewide or citywide) Democratic vote share is 60\%, and the jurisdiction-wide Black share of \VAR{pretty_population_group} is 35\%. Then a district with 52\% Democratic vote share and 36% Black \VAR{pretty_population_group} will have Democratic Voter Deviation 0.52-0.6 = -0.08 and Minority Population Deviation of 0.36-0.35 = +0.01. Democratic vote shares are from the 2020 Presidential election. Values for districts in the ensemble are shown as a 2D histogram; values for the proposed plan are superimposed and are colored by whether they show signatures of gerrymandering: cracked (yellow), packed (orange), stuffed (purple), or unclassified (red). }
+\caption{Correlation between Democratic vote share and Black \VAR{pretty_population_group}, illustrated as deviations from the jurisdiction-wide means. For example: suppose the jurisdiction-wide (i.e. statewide or citywide) Democratic vote share is 60\%, and the jurisdiction-wide Black share of \VAR{pretty_population_group} is 35\%. Then a district with 52\% Democratic vote share and 36\% Black \VAR{pretty_population_group} will have Democratic Voter Deviation 0.52-0.6 = -0.08 and Minority Population Deviation of 0.36-0.35 = +0.01. Democratic vote shares are from the 2020 Presidential election. Values for districts in the ensemble are shown as a 2D histogram; values for the proposed plan are superimposed and are colored by whether they show signatures of gerrymandering: cracked (yellow), packed (orange), stuffed (purple), or unclassified (red). }
 \label{fig:rpd-with-ens-PRES20-B-\VAR{population_group}}
 \end{figure}
 
@@ -454,9 +451,9 @@ the value for the Proposed map is shown in red. In Figure~\ref{fig:num-dists-bhv
 \end{figure}
 \BLOCK{ endfor }
 
-\BLOCK{ for [population_group,pretty_population_group] in population_groups }
+\BLOCK{ for (population_group,pretty_population_group) in population_groups }
 \begin{figure}[h]{\centering \includegraphics[width=7.3307in,height=3.9472in]{\VAR{plots_directory}racial-political-deviations-with-ensemble-\VAR{chamber}-\VAR{plan}-SEN20-B-\VAR{population_group}.pdf} \par}
-\caption{Correlation between Democratic vote share and Black \VAR{pretty_population_group}, illustrated as deviations from the jurisdiction-wide means. For example: suppose the jurisdiction-wide (i.e. statewide or citywide) Democratic vote share is 60\%, and the jurisdiction-wide Black share of \VAR{pretty_population_group} is 35\%. Then a district with 52\% Democratic vote share and 36% Black \VAR{pretty_population_group} will have Democratic Voter Deviation 0.52-0.6 = -0.08 and Minority Population Deviation of 0.36-0.35 = +0.01. Democratic vote shares are from the 2020 US Senate election. Values for districts in the ensemble are shown as a 2D histogram; values for the proposed plan are superimposed and are colored by whether they show signatures of gerrymandering: cracked (yellow), packed (orange), stuffed (purple), or unclassified (red). }
+\caption{Correlation between Democratic vote share and Black \VAR{pretty_population_group}, illustrated as deviations from the jurisdiction-wide means. For example: suppose the jurisdiction-wide (i.e. statewide or citywide) Democratic vote share is 60\%, and the jurisdiction-wide Black share of \VAR{pretty_population_group} is 35\%. Then a district with 52\% Democratic vote share and 36\% Black \VAR{pretty_population_group} will have Democratic Voter Deviation 0.52-0.6 = -0.08 and Minority Population Deviation of 0.36-0.35 = +0.01. Democratic vote shares are from the 2020 US Senate election. Values for districts in the ensemble are shown as a 2D histogram; values for the proposed plan are superimposed and are colored by whether they show signatures of gerrymandering: cracked (yellow), packed (orange), stuffed (purple), or unclassified (red). }
 \label{fig:rpd-with-ens-SEN20-B-\VAR{population_group}}
 \end{figure}
 
